@@ -1,0 +1,8 @@
+{"id":"email-us","text":"Please contact alice.smith@example.com tomorrow.","entities":[{"type":"EMAIL","start":15,"end":38}]}
+{"id":"phone-us","text":"Call me at +1 415-555-2671 after lunch.","entities":[{"type":"PHONE","start":11,"end":26}]}
+{"id":"phone-in","text":"The callback number is +91 99887 66554.","entities":[{"type":"PHONE","start":23,"end":38}]}
+{"id":"card-spaced","text":"The payment card is 4111 1111 1111 1111.","entities":[{"type":"CARD_OR_ACCOUNT","start":20,"end":39}]}
+{"id":"ifsc","text":"Route this payment through HDFC0001234.","entities":[{"type":"IFSC","start":27,"end":38}]}
+{"id":"mrn","text":"The hospital reference is MRN: AB-123456.","entities":[{"type":"MRN","start":26,"end":40}]}
+{"id":"secret","text":"Revoke sk_live_1234567890ABCD immediately.","entities":[{"type":"SECRET","start":7,"end":29}]}
+{"id":"negative-order","text":"Order 12345 has shipped and costs 1499.","entities":[]}

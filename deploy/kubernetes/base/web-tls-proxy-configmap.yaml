@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airshield-web-tls-proxy
+  namespace: airshield
+data:
+  Caddyfile: |
+    {
+      admin off
+      auto_https off
+    }
+    https://:8443 {
+      tls /var/run/secrets/web-tls/tls.crt /var/run/secrets/web-tls/tls.key
+      reverse_proxy 127.0.0.1:4174
+      header -Server
+    }

@@ -1,0 +1,97 @@
+# Development/hackathon stack only. Do not use these local keys or dev authentication in production.
+services:
+  web:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_EDGE_WS_URL: ws://localhost:8001/ws/voice
+        AIRSHIELD_ALLOW_INSECURE_LOCAL_EDGE: "true"
+    ports: ["4174:4174"]
+    environment:
+      AIRSHIELD_RUNTIME_MODE: development
+      AIRSHIELD_ALLOW_DEVELOPMENT_RUNTIME: "true"
+      CONTROL_PLANE_URL: http://control-plane:8080
+      CONTROL_PLANE_TOKEN_FILE: /run/secrets/control-plane-token
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: llama3.2:3b
+    secrets: [control-plane-token]
+    depends_on:
+      control-plane: {condition: service_healthy}
+      edge: {condition: service_healthy}
+
+  control-plane-migrate:
+    build: ./control-plane
+    command: [alembic, upgrade, head]
+    environment: &control-plane-env
+      ENVIRONMENT: development
+      AUTH_MODE: dev
+      KEY_PROVIDER: local
+      FAIL_CLOSED: "true"
+      DATABASE_URL: postgresql+asyncpg://airshield:airshield-dev-only@postgres:5432/airshield
+      LOCAL_MASTER_KEY_B64: bW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW0=
+      LOCAL_SIGNING_PRIVATE_KEY_B64: c3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3M=
+      TOKEN_INDEX_KEY_B64: aWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWk=
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  control-plane:
+    build: ./control-plane
+    ports: ["8080:8080"]
+    environment: *control-plane-env
+    depends_on:
+      control-plane-migrate: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8080/v1/health/ready')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  postgres:
+    image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
+    environment:
+      POSTGRES_DB: airshield
+      POSTGRES_USER: airshield
+      POSTGRES_PASSWORD: airshield-dev-only
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U airshield -d airshield]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  edge:
+    build: ./edge-service
+    ports: ["8001:8001"]
+    environment:
+      ASR_MODEL: small.en
+      ASR_DEVICE: cpu
+      ASR_COMPUTE_TYPE: int8
+      LANGUAGE: en
+      ENABLE_DIARIZATION: "false"
+      ALLOW_ORIGINS: http://localhost:4174
+      CONTROL_PLANE_URL: http://control-plane:8080
+      CONTROL_PLANE_DEV_TOKEN: development-only
+    volumes: [model-cache:/models]
+    depends_on:
+      control-plane: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8001/v1/health')"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  ollama:
+    image: ollama/ollama@sha256:9d30908e41144b1f1da89b9d8e33c07e4aeb43ff41a8660241b1686e2cc330ad
+    profiles: [local-llm]
+    ports: ["11434:11434"]
+    volumes: [ollama-data:/root/.ollama]
+
+secrets:
+  control-plane-token:
+    file: ./deploy/dev/control-plane.token
+volumes:
+  postgres-data:
+  model-cache:
+  ollama-data:

@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: {name: airshield-postgresql, namespace: airshield}
+spec:
+  serviceName: airshield-postgresql
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: airshield-postgresql}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: airshield-postgresql}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: postgres
+          image: postgres:17.6@sha256:REPLACE_WITH_VERIFIED_IMAGE_DIGEST
+          args:
+            - postgres
+            - -c
+            - ssl=on
+            - -c
+            - ssl_min_protocol_version=TLSv1.3
+            - -c
+            - ssl_cert_file=/var/lib/postgresql/tls/tls.crt
+            - -c
+            - ssl_key_file=/var/lib/postgresql/tls/tls.key
+          ports:
+            - {name: postgres, containerPort: 5432}
+          env:
+            - {name: POSTGRES_DB, value: airshield}
+            - {name: POSTGRES_USER, valueFrom: {secretKeyRef: {name: airshield-postgresql-bootstrap, key: username}}}
+            - {name: POSTGRES_PASSWORD, valueFrom: {secretKeyRef: {name: airshield-postgresql-bootstrap, key: password}}}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          resources:
+            requests: {cpu: 500m, memory: 1Gi}
+            limits: {cpu: "2", memory: 4Gi}
+          readinessProbe:
+            exec: {command: [pg_isready, -U, airshield]}
+            periodSeconds: 10
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/postgresql/data}
+            - {name: tls, mountPath: /var/lib/postgresql/tls, readOnly: true}
+      volumes:
+        - name: tls
+          secret: {secretName: airshield-postgresql-tls, defaultMode: 416}
+  volumeClaimTemplates:
+    - metadata: {name: data}
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests: {storage: 100Gi}

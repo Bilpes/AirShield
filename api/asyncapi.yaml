@@ -1,0 +1,202 @@
+asyncapi: 2.6.0
+info:
+  title: AirShield Real-Time Voice Stream API
+  version: 1.0.0
+  description: >-
+    WebSocket contract for sending English audio to a customer-controlled edge
+    gateway and receiving synchronized raw-local and protected-outbound events.
+    Raw events are authorized only for the local UI, are not evidence payloads,
+    and must never be published to an AI destination. A production release
+    requires evaluated, version-pinned speech, diarization, and entity models.
+servers:
+  customerGateway:
+    url: gateway.airshield.internal/ws/voice
+    protocol: wss
+    description: TLS-terminating authenticated gateway; the private edge is never browser-reachable.
+    security:
+      - browserSession: []
+      - workloadJwt: []
+channels:
+  /:
+    publish:
+      operationId: sendToEdge
+      message:
+        oneOf:
+          - $ref: '#/components/messages/AudioChunk'
+          - $ref: '#/components/messages/ControlMessage'
+    subscribe:
+      operationId: receiveProtectionEvents
+      message:
+        oneOf:
+          - $ref: '#/components/messages/SpeakerDetected'
+          - $ref: '#/components/messages/TranscriptPair'
+          - $ref: '#/components/messages/RawTranscript'
+          - $ref: '#/components/messages/ProtectedTranscript'
+          - $ref: '#/components/messages/FinalProtectedTranscript'
+          - $ref: '#/components/messages/EntityDetected'
+          - $ref: '#/components/messages/IdentityBinding'
+          - $ref: '#/components/messages/PolicyDecision'
+          - $ref: '#/components/messages/EgressReceipt'
+components:
+  securitySchemes:
+    browserSession:
+      type: httpApiKey
+      name: Cookie
+      in: header
+      description: Short-lived Secure HttpOnly host-issued OIDC session cookie; never place it in the URL.
+    workloadJwt:
+      type: httpApiKey
+      name: Authorization
+      in: header
+      description: Bearer OIDC JWT for non-browser clients; the signed tenant claim scopes the session.
+  messages:
+    AudioChunk:
+      name: audio.chunk
+      contentType: application/octet-stream
+      payload:
+        type: string
+        format: binary
+    ControlMessage:
+      name: session.control
+      payload:
+        type: object
+        required: [type]
+        properties:
+          type: {type: string, enum: [session.start, session.end]}
+          language: {type: string, const: en}
+          policy: {type: string, description: Allowlisted policy identifier or product label.}
+          audio_format: {type: string, enum: [audio/webm, audio/webm;codecs=opus, audio/mp4, audio/ogg, audio/ogg;codecs=opus], description: Browser recorder container validated by the gateway and used only by the self-hosted decoder.}
+    IdentityAssertion:
+      name: identity.assert
+      description: Gateway-internal assertion derived only from signed host claims; clients cannot inject it. The LLM and diarization model do not authenticate the person.
+      payload:
+        type: object
+        required: [type, speaker_track, subject_token, assurance, source]
+        properties:
+          type: {type: string, const: identity.assert}
+          speaker_track: {type: string, example: SPEAKER_A}
+          subject_token: {type: string, description: Opaque host identity reference; persisted only as a keyed digest.}
+          assurance: {type: string, enum: [unverified, claimed, otp_verified, sso_verified, biometric_verified]}
+          source: {type: string, enum: [host_app, sso, otp, ivr, crm, ehr, voice_biometric]}
+          consent_id: {type: string}
+    SpeakerDetected:
+      name: speaker.detected
+      payload:
+        type: object
+        properties:
+          type: {type: string, const: speaker.detected}
+          speaker_track: {type: string, example: SPEAKER_B}
+          diarization_confidence: {type: number}
+          status: {type: string, enum: [unknown, claimed, bound]}
+    TranscriptPair:
+      name: transcript.pair
+      description: Authorized local UI pair; the protected half remains provisional and is not an egress authorization.
+      payload:
+        type: object
+        required: [type, sequence, speaker_track, raw, protected, decision, safe_for_egress]
+        properties:
+          type: {type: string, const: transcript.pair}
+          sequence: {type: integer}
+          speaker_track: {type: string}
+          speaker: {type: string, description: Display label; not an authenticated identity.}
+          speaker_token: {type: string, pattern: '^\[SPEAKER_[A-F0-9]{6}\]$'}
+          raw: {type: string, description: Local authorized UI only.}
+          protected: {type: string}
+          decision: {type: string, enum: [allow, block, review]}
+          entities:
+            type: array
+            items: {type: object}
+          time: {type: number, minimum: 0}
+          provisional: {type: boolean, const: true}
+          safe_for_egress: {type: boolean, const: false}
+    RawTranscript:
+      name: transcript.raw
+      description: Local authorized UI only; never route to the downstream AI topic.
+      payload:
+        type: object
+        properties:
+          type: {type: string, const: transcript.raw}
+          sequence: {type: integer}
+          speaker_track: {type: string}
+          text: {type: string}
+          final: {type: boolean}
+    ProtectedTranscript:
+      name: transcript.protected
+      description: Provisional local-UI event. Chunk-boundary context is incomplete, so this event is never eligible for AI egress.
+      payload:
+        type: object
+        properties:
+          type: {type: string, const: transcript.protected}
+          sequence: {type: integer}
+          speaker_token: {type: string, example: '[SPEAKER_8A91C2]'}
+          text: {type: string}
+          provisional: {type: boolean, const: true}
+          safe_for_egress: {type: boolean, const: false}
+    FinalProtectedTranscript:
+      name: transcript.final
+      description: Full-context control-plane result. Egress is permitted only when decision is allow and a signed receipt is present.
+      payload:
+        type: object
+        required: [type, protected, decision, safe_for_egress, receipt]
+        properties:
+          type: {type: string, const: transcript.final}
+          protected: {type: string}
+          entities:
+            type: array
+            items: {type: object}
+          decision: {type: string, enum: [allow, block, review]}
+          reason: {type: string}
+          safe_for_egress: {type: boolean}
+          receipt:
+            type: object
+            required: [receipt_id, content_sha256, event_hash, signature, signing_key_id]
+            properties:
+              receipt_id: {type: string}
+              content_sha256: {type: string}
+              event_hash: {type: string}
+              signature: {type: string}
+              signing_key_id: {type: string}
+    EntityDetected:
+      name: entity.detected
+      payload:
+        type: object
+        properties:
+          type: {type: string, const: entity.detected}
+          sequence: {type: integer}
+          entity_type: {type: string}
+          token: {type: string}
+          start: {type: integer}
+          end: {type: integer}
+          confidence: {type: number}
+    IdentityBinding:
+      name: identity.binding
+      payload:
+        type: object
+        properties:
+          type: {type: string, const: identity.binding}
+          speaker_track: {type: string}
+          llm_speaker_token: {type: string}
+          assurance: {type: string}
+          status: {type: string}
+    PolicyDecision:
+      name: policy.decision
+      payload:
+        type: object
+        properties:
+          type: {type: string, const: policy.decision}
+          decision: {type: string, enum: [allow, block, review]}
+          policy: {type: string}
+          reason_codes:
+            type: array
+            items: {type: string}
+    EgressReceipt:
+      name: egress.receipt
+      payload:
+        type: object
+        properties:
+          type: {type: string, const: egress.receipt}
+          receipt_id: {type: string}
+          content_sha256: {type: string}
+          policy: {type: string}
+          decision: {type: string}
+          signature: {type: string}

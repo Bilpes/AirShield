@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airshield-gateway-config
+  namespace: airshield
+data:
+  ENVIRONMENT: production
+  EDGE_WEBSOCKET_URL: wss://airshield-edge:8001/ws/voice
+  EDGE_CA_FILE: /var/run/secrets/edge-tls/ca.crt
+  ALLOW_ORIGINS: https://REPLACE_APP_HOST
+  OIDC_ISSUER: https://REPLACE_OIDC_ISSUER
+  OIDC_AUDIENCE: api://REPLACE_BROWSER_AUDIENCE
+  OIDC_JWKS_URL: https://REPLACE_OIDC_JWKS_HOST/keys
+  TENANT_CLAIM: tid
+  EXPECTED_TENANT_ID: REPLACE_TENANT_ID
+  SPEAKER_TRACK_CLAIM: airshield_speaker_track
+  SESSION_COOKIE_NAME: airshield_session
+  MAX_CONNECTIONS: "200"
+  MAX_MESSAGE_BYTES: "1048576"
+  MAX_SESSION_AUDIO_BYTES: "100000000"
+  MAX_MESSAGES_PER_SECOND: "20"
+  MAX_SESSION_SECONDS: "3600"
+  FINAL_WAIT_SECONDS: "15"

@@ -1,0 +1,18 @@
+id: healthcare-us-eu-v1
+version: "1.0.0"
+language: en
+mapping_ttl_minutes: 1440
+raw_buffer_ttl_seconds: 30
+review_below_threshold: true
+legal_tags: [HIPAA, GDPR, EHDS-readiness]
+allowed_destinations: [clinical-note-local, ehr-writeback, approved-health-llm]
+entities:
+  PERSON: {action: tokenize, threshold: 0.82, critical: true}
+  LOCATION: {action: generalize, threshold: 0.80, critical: false}
+  DATE_TIME: {action: tokenize, threshold: 0.88, critical: true}
+  MRN: {action: tokenize, threshold: 0.95, critical: true}
+  CARD_OR_ACCOUNT: {action: tokenize, threshold: 0.92, critical: true}
+  PHONE: {action: mask, threshold: 0.90, critical: true}
+  EMAIL: {action: mask, threshold: 0.94, critical: true}
+  ADDRESS: {action: generalize, threshold: 0.86, critical: true}
+  IP_ADDRESS: {action: tokenize, threshold: 0.92, critical: false}

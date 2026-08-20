@@ -1,0 +1,110 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airshield-web
+  namespace: airshield
+  labels: {app.kubernetes.io/name: airshield-web}
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  strategy:
+    rollingUpdate: {maxUnavailable: 0, maxSurge: 1}
+  selector:
+    matchLabels: {app.kubernetes.io/name: airshield-web}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: airshield-web}
+    spec:
+      serviceAccountName: airshield-web
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: web
+          image: ghcr.io/example/airshield-web@sha256:REPLACE_WITH_SIGNED_IMAGE_DIGEST
+          ports:
+            - {name: app, containerPort: 4174}
+          env:
+            - {name: AIRSHIELD_RUNTIME_MODE, value: production}
+            - {name: CONTROL_PLANE_URL, value: https://airshield-control-plane:8080}
+            - {name: NODE_EXTRA_CA_CERTS, value: /var/run/secrets/control-plane-tls/ca.crt}
+            - {name: CONTROL_PLANE_TOKEN_FILE, value: /var/run/secrets/tokens/control-plane}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          resources:
+            requests: {cpu: 200m, memory: 256Mi}
+            limits: {cpu: "1", memory: 1Gi}
+          readinessProbe:
+            httpGet: {path: /api/health, port: secure, scheme: HTTPS}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /, port: secure, scheme: HTTPS}
+            periodSeconds: 30
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+            - {name: next-cache, mountPath: /app/.next/cache}
+            - {name: workload-token, mountPath: /var/run/secrets/tokens, readOnly: true}
+            - {name: control-plane-tls, mountPath: /var/run/secrets/control-plane-tls, readOnly: true}
+        - name: tls-proxy
+          image: caddy:2.10.0-alpine@sha256:ae4458638da8e1a91aafffb231c5f8778e964bca650c8a8cb23a7e8ac557aa3
+          args: [run, --config, /etc/caddy/Caddyfile, --adapter, caddyfile]
+          ports:
+            - {name: secure, containerPort: 8443}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            runAsGroup: 1001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          resources:
+            requests: {cpu: 25m, memory: 32Mi}
+            limits: {cpu: 250m, memory: 128Mi}
+          readinessProbe:
+            tcpSocket: {port: secure}
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: {port: secure}
+            periodSeconds: 30
+          volumeMounts:
+            - {name: caddy-config, mountPath: /etc/caddy, readOnly: true}
+            - {name: web-tls, mountPath: /var/run/secrets/web-tls, readOnly: true}
+            - {name: caddy-data, mountPath: /data}
+            - {name: caddy-config-writable, mountPath: /config}
+      volumes:
+        - name: tmp
+          emptyDir: {sizeLimit: 64Mi}
+        - name: next-cache
+          emptyDir: {sizeLimit: 256Mi}
+        - name: workload-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: control-plane
+                  audience: api://airshield-control-plane
+                  expirationSeconds: 3600
+        - name: control-plane-tls
+          secret:
+            secretName: airshield-control-plane-tls
+            defaultMode: 0444
+            items:
+              - {key: ca.crt, path: ca.crt}
+        - name: caddy-config
+          configMap: {name: airshield-web-tls-proxy}
+        - name: web-tls
+          secret:
+            secretName: airshield-web-tls
+            defaultMode: 0440
+            items:
+              - {key: tls.crt, path: tls.crt}
+              - {key: tls.key, path: tls.key}
+        - name: caddy-data
+          emptyDir: {sizeLimit: 16Mi}
+        - name: caddy-config-writable
+          emptyDir: {sizeLimit: 16Mi}

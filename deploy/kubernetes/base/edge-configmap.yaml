@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airshield-edge
+  namespace: airshield
+data:
+  ENVIRONMENT: production
+  LANGUAGE: en
+  ASR_MODEL: /models/whisper-small-en
+  ASR_DEVICE: cpu
+  ASR_COMPUTE_TYPE: int8
+  ENABLE_DIARIZATION: "false"
+  MODEL_MANIFEST_PATH: /models/manifest.json
+  MODEL_MANIFEST_SHA256: REPLACE_WITH_64_CHAR_LOWERCASE_SHA256
+  MAX_AUDIO_BYTES: "100000000"
+  MAX_CONCURRENT_INFERENCE: "1"
+  ALLOW_ORIGINS: https://airshield.internal.example
+  CONTROL_PLANE_URL: https://airshield-control-plane:8080
+  CONTROL_PLANE_CA_FILE: /var/run/secrets/control-plane-tls/ca.crt
+  CONTROL_PLANE_TOKEN_FILE: /var/run/secrets/tokens/control-plane

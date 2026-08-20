@@ -1,0 +1,12 @@
+using './main.bicep'
+
+param prefix = 'contoso'
+param location = 'swedencentral'
+param tenantId = '00000000-0000-0000-0000-000000000000'
+param postgresAdminPassword = '<supply-through-secure-pipeline>'
+param databaseUrl = 'postgresql+asyncpg://airshield_admin:<url-encoded-password>@<private-host>:5432/airshield?ssl=verify-full&sslrootcert=/var/run/secrets/database/ca.crt'
+param tokenIndexKeyB64 = '<base64-encoded-random-32-byte-secret>'
+param edgeGatewaySharedSecret = '<current-random-secret-of-at-least-32-characters>'
+param edgeGatewayPreviousSecret = '<distinct-staged-random-secret-of-at-least-32-characters>'
+param kubernetesVersion = '1.32'
+param postgresGeoRedundantBackup = true

@@ -1,0 +1,15 @@
+version: "1.0"
+release_blocking: true
+scope: english-nordic-eu-us
+minimum:
+  micro_recall: 0.995
+  critical_entity_recall: 0.999
+  micro_precision: 0.95
+  max_false_negatives: 0
+critical_entities: [PERSON, CARD_OR_ACCOUNT, EMAIL, PHONE, MRN, SECRET]
+requirements:
+  - Contextual model must be installed, version-pinned, and healthy.
+  - Evaluation must use customer-approved representative Nordic/EU and US data with documented lawful basis.
+  - Synthetic fixtures are smoke tests and cannot satisfy the production release gate alone.
+  - Every model, recognizer, threshold, and policy change reruns regression and drift evaluation.
+  - Failed or unavailable evaluation evidence blocks promotion.

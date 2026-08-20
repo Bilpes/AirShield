@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airshield-edge
+  namespace: airshield
+  labels: {app.kubernetes.io/name: airshield-edge}
+spec:
+  replicas: 2
+  strategy:
+    rollingUpdate: {maxUnavailable: 0, maxSurge: 1}
+  selector:
+    matchLabels: {app.kubernetes.io/name: airshield-edge}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: airshield-edge}
+    spec:
+      serviceAccountName: airshield-edge
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: edge
+          image: ghcr.io/example/airshield-edge@sha256:REPLACE_WITH_SIGNED_IMAGE_DIGEST
+          command: [uvicorn]
+          args:
+            - app.main:app
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8001"
+            - --ssl-certfile
+            - /var/run/secrets/edge-tls/tls.crt
+            - --ssl-keyfile
+            - /var/run/secrets/edge-tls/tls.key
+            - --no-proxy-headers
+          ports:
+            - {name: https, containerPort: 8001}
+          envFrom:
+            - configMapRef: {name: airshield-edge}
+          env:
+            - name: GATEWAY_SHARED_SECRET
+              valueFrom:
+                secretKeyRef: {name: airshield-edge-gateway, key: current}
+            - name: GATEWAY_PREVIOUS_SECRET
+              valueFrom:
+                secretKeyRef: {name: airshield-edge-gateway, key: previous, optional: true}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          resources:
+            requests: {cpu: "2", memory: 4Gi}
+            limits: {cpu: "6", memory: 12Gi}
+          startupProbe:
+            httpGet: {path: /v1/health, port: https, scheme: HTTPS}
+            failureThreshold: 60
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: {path: /v1/health, port: https, scheme: HTTPS}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /v1/health/live, port: https, scheme: HTTPS}
+            periodSeconds: 30
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+            - {name: models, mountPath: /models, readOnly: true}
+            - {name: workload-token, mountPath: /var/run/secrets/tokens, readOnly: true}
+            - {name: edge-tls, mountPath: /var/run/secrets/edge-tls, readOnly: true}
+            - {name: control-plane-tls, mountPath: /var/run/secrets/control-plane-tls, readOnly: true}
+      volumes:
+        - name: tmp
+          emptyDir: {sizeLimit: 2Gi}
+        - name: models
+          persistentVolumeClaim: {claimName: airshield-models}
+        - name: workload-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: control-plane
+                  audience: api://airshield-control-plane
+                  expirationSeconds: 3600
+        - name: edge-tls
+          secret:
+            secretName: airshield-edge-tls
+            defaultMode: 0440
+            items:
+              - {key: tls.crt, path: tls.crt}
+              - {key: tls.key, path: tls.key}
+        - name: control-plane-tls
+          secret:
+            secretName: airshield-control-plane-tls
+            defaultMode: 0444
+            items:
+              - {key: ca.crt, path: ca.crt}

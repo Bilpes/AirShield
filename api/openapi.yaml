@@ -1,0 +1,774 @@
+openapi: 3.1.0
+info:
+  title: AirShield Privacy Control Plane API
+  version: 1.0.0
+  description: Tenant-isolated English PII/PHI/PCI protection, signed evidence, identity binding, deletion, and
+    dual-control reidentification. Production callers authenticate with workload OIDC JWTs. Source code alone is
+    not certification or compliance evidence.
+paths:
+  /v1/health/live:
+    get:
+      summary: Live
+      operationId: live_v1_health_live_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /v1/health/ready:
+    get:
+      summary: Ready
+      operationId: ready_v1_health_ready_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /v1/sessions:
+    post:
+      summary: Sessions
+      operationId: sessions_v1_sessions_post
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSessionRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          description: Missing or invalid workload identity
+        '403':
+          description: Tenant or scope authorization denied
+      description: Create a tenant-scoped protection session.
+      x-required-scope: airshield.protect
+  /v1/protect:
+    post:
+      summary: Protect Route
+      operationId: protect_route_v1_protect_post
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProtectRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProtectResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          description: Missing or invalid workload identity
+        '403':
+          description: Tenant or scope authorization denied
+      description: Protect text and issue a signed, hash-chained, metadata-only egress receipt.
+      x-required-scope: airshield.protect
+  /v1/sessions/{session_id}/bindings:
+    post:
+      summary: Binding
+      operationId: binding_v1_sessions__session_id__bindings_post
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IdentityBindingRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityBindingResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          description: Missing or invalid workload identity
+        '403':
+          description: Tenant or scope authorization denied
+      description: Bind a trusted host identity digest to a diarized speaker track. Diarization does not authenticate
+        the person.
+      x-required-scope: airshield.bind
+  /v1/sessions/{session_id}/data:
+    delete:
+      summary: Delete Data
+      operationId: delete_data_v1_sessions__session_id__data_delete
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeletionRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletionResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          description: Missing or invalid workload identity
+        '403':
+          description: Tenant or scope authorization denied
+      description: Delete live token mappings and identity bindings for a tenant-scoped session; record a metadata-only
+        deletion event.
+      x-required-scope: airshield.delete
+  /v1/reidentification-requests:
+    post:
+      summary: Reid Request
+      operationId: reid_request_v1_reidentification_requests_post
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReidentificationCreate'
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReidentificationResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          description: Missing or invalid workload identity
+        '403':
+          description: Tenant or scope authorization denied
+      description: Request purpose- and ticket-bound reidentification.
+      x-required-scope: airshield.reidentify.request
+  /v1/reidentification-requests/{request_id}/approve:
+    post:
+      summary: Reid Approve
+      operationId: reid_approve_v1_reidentification_requests__request_id__approve_post
+      security:
+      - HTTPBearer: []
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReidentificationResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          description: Missing or invalid workload identity
+        '403':
+          description: Tenant or scope authorization denied
+      description: Approve with a principal distinct from the requester.
+      x-required-scope: airshield.reidentify.approve
+  /v1/reidentification-requests/{request_id}/result:
+    get:
+      summary: Reid Result
+      operationId: reid_result_v1_reidentification_requests__request_id__result_get
+      security:
+      - HTTPBearer: []
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReidentificationResult'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          description: Missing or invalid workload identity
+        '403':
+          description: Tenant or scope authorization denied
+      description: One-time plaintext result for the original requester after approval.
+      x-required-scope: airshield.reidentify.request
+  /v1/evidence/{event_id}:
+    get:
+      summary: Evidence
+      operationId: evidence_v1_evidence__event_id__get
+      security:
+      - HTTPBearer: []
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          description: Missing or invalid workload identity
+        '403':
+          description: Tenant or scope authorization denied
+      description: Retrieve a tenant-scoped egress receipt; receipts contain no raw protected value.
+      x-required-scope: airshield.evidence.read
+  /v1/evidence/verify:
+    post:
+      summary: Verify Evidence
+      operationId: verify_evidence_v1_evidence_verify_post
+      security:
+      - HTTPBearer: []
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvidenceVerifyResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '401':
+          description: Missing or invalid workload identity
+        '403':
+          description: Tenant or scope authorization denied
+      description: Verify the complete tenant evidence hash chain and external signatures.
+      x-required-scope: airshield.admin
+  /:
+    get:
+      summary: Root
+      operationId: root__get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+components:
+  schemas:
+    CreateSessionRequest:
+      properties:
+        policy:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9-]{2,127}$
+          title: Policy
+        language:
+          type: string
+          const: en
+          title: Language
+          default: en
+        ttl_minutes:
+          type: integer
+          maximum: 1440.0
+          minimum: 5.0
+          title: Ttl Minutes
+          default: 60
+      type: object
+      required:
+      - policy
+      title: CreateSessionRequest
+    DeletionRequest:
+      properties:
+        purpose:
+          type: string
+          enum:
+          - privacy_erasure
+          - retention_expiry
+          - contract_termination
+          - security_containment
+          title: Purpose
+        ticket_reference:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$
+          title: Ticket Reference
+      type: object
+      required:
+      - purpose
+      - ticket_reference
+      title: DeletionRequest
+    DeletionResponse:
+      properties:
+        session_id:
+          type: string
+          title: Session Id
+        status:
+          type: string
+          const: deleted
+          title: Status
+        token_mappings_deleted:
+          type: integer
+          title: Token Mappings Deleted
+        identity_bindings_deleted:
+          type: integer
+          title: Identity Bindings Deleted
+        deletion_event_id:
+          type: string
+          title: Deletion Event Id
+      type: object
+      required:
+      - session_id
+      - status
+      - token_mappings_deleted
+      - identity_bindings_deleted
+      - deletion_event_id
+      title: DeletionResponse
+    EvidenceVerifyResponse:
+      properties:
+        valid:
+          type: boolean
+          title: Valid
+        checked_events:
+          type: integer
+          title: Checked Events
+        first_invalid_sequence:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: First Invalid Sequence
+      type: object
+      required:
+      - valid
+      - checked_events
+      title: EvidenceVerifyResponse
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    HealthResponse:
+      properties:
+        status:
+          type: string
+          title: Status
+        database:
+          type: string
+          title: Database
+        key_provider:
+          type: string
+          title: Key Provider
+        detector:
+          type: string
+          title: Detector
+        fail_closed:
+          type: boolean
+          title: Fail Closed
+        environment:
+          type: string
+          title: Environment
+      type: object
+      required:
+      - status
+      - database
+      - key_provider
+      - detector
+      - fail_closed
+      - environment
+      title: HealthResponse
+    IdentityBindingRequest:
+      properties:
+        speaker_track:
+          type: string
+          pattern: ^SPEAKER_[A-Z0-9]{1,8}$
+          title: Speaker Track
+        subject_token:
+          type: string
+          maxLength: 256
+          minLength: 3
+          title: Subject Token
+        assurance:
+          type: string
+          enum:
+          - unverified
+          - claimed
+          - otp_verified
+          - sso_verified
+          - biometric_verified
+          title: Assurance
+        source:
+          type: string
+          enum:
+          - host_app
+          - sso
+          - otp
+          - ivr
+          - crm
+          - ehr
+          - voice_biometric
+          title: Source
+        consent_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Consent Id
+      type: object
+      required:
+      - speaker_track
+      - subject_token
+      - assurance
+      - source
+      title: IdentityBindingRequest
+    IdentityBindingResponse:
+      properties:
+        speaker_track:
+          type: string
+          title: Speaker Track
+        llm_speaker_token:
+          type: string
+          title: Llm Speaker Token
+        assurance:
+          type: string
+          title: Assurance
+        status:
+          type: string
+          title: Status
+      type: object
+      required:
+      - speaker_track
+      - llm_speaker_token
+      - assurance
+      - status
+      title: IdentityBindingResponse
+    ProtectRequest:
+      properties:
+        session_id:
+          type: string
+          pattern: ^ses_[a-f0-9]{24}$
+          title: Session Id
+        text:
+          type: string
+          minLength: 1
+          title: Text
+        policy:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9-]{2,127}$
+          title: Policy
+        destination:
+          type: string
+          pattern: ^[a-z][a-z0-9-]{2,63}$
+          title: Destination
+        speaker_token:
+          anyOf:
+          - type: string
+            pattern: ^\[SPEAKER_[A-F0-9]{6}\]$
+          - type: 'null'
+          title: Speaker Token
+        idempotency_key:
+          type: string
+          maxLength: 128
+          minLength: 16
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]+$
+          title: Idempotency Key
+      type: object
+      required:
+      - session_id
+      - text
+      - policy
+      - destination
+      - idempotency_key
+      title: ProtectRequest
+    ProtectResponse:
+      properties:
+        protected_text:
+          type: string
+          title: Protected Text
+        entities:
+          items:
+            $ref: '#/components/schemas/ProtectedEntity'
+          type: array
+          title: Entities
+        decision:
+          type: string
+          enum:
+          - allow
+          - block
+          - review
+          title: Decision
+        receipt:
+          $ref: '#/components/schemas/ReceiptResponse'
+      type: object
+      required:
+      - protected_text
+      - entities
+      - decision
+      - receipt
+      title: ProtectResponse
+    ProtectedEntity:
+      properties:
+        type:
+          type: string
+          title: Type
+        token:
+          type: string
+          title: Token
+        start:
+          type: integer
+          title: Start
+        end:
+          type: integer
+          title: End
+        confidence:
+          type: number
+          title: Confidence
+      type: object
+      required:
+      - type
+      - token
+      - start
+      - end
+      - confidence
+      title: ProtectedEntity
+    ReceiptResponse:
+      properties:
+        receipt_id:
+          type: string
+          title: Receipt Id
+        sequence:
+          type: integer
+          title: Sequence
+        content_sha256:
+          type: string
+          title: Content Sha256
+        policy:
+          type: string
+          title: Policy
+        policy_version:
+          type: string
+          title: Policy Version
+        entity_counts:
+          additionalProperties:
+            type: integer
+          type: object
+          title: Entity Counts
+        destination:
+          type: string
+          title: Destination
+        decision:
+          type: string
+          title: Decision
+        reason_codes:
+          items:
+            type: string
+          type: array
+          title: Reason Codes
+        previous_hash:
+          type: string
+          title: Previous Hash
+        event_hash:
+          type: string
+          title: Event Hash
+        signature:
+          type: string
+          title: Signature
+        signing_key_id:
+          type: string
+          title: Signing Key Id
+        signing_algorithm:
+          type: string
+          title: Signing Algorithm
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - receipt_id
+      - sequence
+      - content_sha256
+      - policy
+      - policy_version
+      - entity_counts
+      - destination
+      - decision
+      - previous_hash
+      - event_hash
+      - signature
+      - signing_key_id
+      - signing_algorithm
+      - created_at
+      title: ReceiptResponse
+    ReidentificationCreate:
+      properties:
+        session_id:
+          type: string
+          pattern: ^ses_[a-f0-9]{24}$
+          title: Session Id
+        token:
+          type: string
+          pattern: ^\[[A-Z0-9_]+\]$
+          title: Token
+        purpose:
+          type: string
+          enum:
+          - security_incident
+          - privacy_request
+          - clinical_safety
+          - fraud_investigation
+          - legal_hold
+          - customer_support_escalation
+          title: Purpose
+        ticket_reference:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$
+          title: Ticket Reference
+      type: object
+      required:
+      - session_id
+      - token
+      - purpose
+      - ticket_reference
+      title: ReidentificationCreate
+    ReidentificationResponse:
+      properties:
+        request_id:
+          type: string
+          title: Request Id
+        status:
+          type: string
+          title: Status
+        expires_at:
+          type: string
+          format: date-time
+          title: Expires At
+      type: object
+      required:
+      - request_id
+      - status
+      - expires_at
+      title: ReidentificationResponse
+    ReidentificationResult:
+      properties:
+        request_id:
+          type: string
+          title: Request Id
+        token:
+          type: string
+          title: Token
+        value:
+          type: string
+          title: Value
+        consumed_at:
+          type: string
+          format: date-time
+          title: Consumed At
+      type: object
+      required:
+      - request_id
+      - token
+      - value
+      - consumed_at
+      title: ReidentificationResult
+    SessionResponse:
+      properties:
+        session_id:
+          type: string
+          title: Session Id
+        policy:
+          type: string
+          title: Policy
+        policy_version:
+          type: string
+          title: Policy Version
+        language:
+          type: string
+          title: Language
+        expires_at:
+          type: string
+          format: date-time
+          title: Expires At
+      type: object
+      required:
+      - session_id
+      - policy
+      - policy_version
+      - language
+      - expires_at
+      title: SessionResponse
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+  securitySchemes:
+    HTTPBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: OIDC JWT
+      description: Trusted workload JWT; a verified signed claim scopes every tenant operation.
+servers:
+- url: https://airshield-control.internal
+  description: Private customer deployment

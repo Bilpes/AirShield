@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+  - secret-provider-class.yaml
+  - gateway-secret-provider-class.yaml
+  - entra-egress.yaml
+patches:
+  - path: workload-identity-patch.yaml
+configMapGenerator:
+  - name: airshield-azure-settings
+    namespace: airshield
+    literals:
+      - KEY_PROVIDER=azure
+      - AZURE_KEY_VAULT_URL=https://REPLACE.vault.azure.net
+      - AZURE_WRAP_KEY_NAME=airshield-wrap
+      - AZURE_SIGN_KEY_NAME=airshield-receipt-sign
+generatorOptions:
+  disableNameSuffixHash: true
