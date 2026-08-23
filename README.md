@@ -4,6 +4,8 @@ AirShield is a responsive, voice-first privacy control for Healthcare, Finance, 
 
 No Azure Speech, Google Speech-to-Text, AWS Transcribe, or OpenAI transcription API is required.
 
+The responsive product now includes **CareShield Assistant**, an initially open, collapsible protected virtual-intake and synthetic doctor-booking demonstration. Typed or self-hosted voice input shows raw content locally and a separate protected RIA preview with entity count, decision, and receipt. It provides emergency guidance and explicitly does not diagnose, create a clinical record, or make a real appointment.
+
 ## Architecture
 
 - **UI:** Next.js 16, React 19, TypeScript, responsive desktop/tablet/mobile views
@@ -22,6 +24,13 @@ No Azure Speech, Google Speech-to-Text, AWS Transcribe, or OpenAI transcription 
 For a complete source map, architecture explanation, local/Compose/manual setup, production deployment sequence, and validation commands, see [AIRSHIELD_SOURCE_AND_RUN_GUIDE.md](AIRSHIELD_SOURCE_AND_RUN_GUIDE.md).
 
 For the client and executive narrative—including architecture, sector uses, business flow, legacy/new-application integration, technology stack, differentiation, ROI, go-to-market, roadmap, risks, and CEO questions—see [AirShield Executive Architecture & Business Dossier](docs/AirShield_Executive_Architecture_and_Business_Dossier.pdf). The editable source is [AIRSHIELD_EXECUTIVE_ARCHITECTURE_AND_BUSINESS.md](docs/AIRSHIELD_EXECUTIVE_ARCHITECTURE_AND_BUSINESS.md).
+
+Implementation deliverables:
+
+- [AirShield Requirements and Runbook](docs/AirShield_Requirements_and_Runbook.pdf) — requirements, exact run steps, CareShield demonstration, verification and production gates. Editable source: [AIRSHIELD_REQUIREMENTS_AND_RUNBOOK.md](docs/AIRSHIELD_REQUIREMENTS_AND_RUNBOOK.md).
+- [AirShield CEO Technical Briefing](docs/AirShield_CEO_Technical_Briefing.pdf) — detailed trust boundaries, technology, encryption/token-vault logic, speaker identity, voice capture, RIA integration and limitations. Editable source: [AIRSHIELD_CEO_TECHNICAL_BRIEFING.md](docs/AIRSHIELD_CEO_TECHNICAL_BRIEFING.md).
+
+Regenerate both implementation PDFs with `python scripts/build_release_pdfs.py` after installing ReportLab.
 
 ## Run the UI demo
 

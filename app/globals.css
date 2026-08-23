@@ -20,6 +20,7 @@
   button, a, select, input[type="checkbox"], input[type="range"] { cursor:pointer; }
   button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline:3px solid rgba(11,174,151,.25); outline-offset:2px; }
   .muted { color:var(--ink-500); }
+  .sr-only { position:absolute!important; width:1px!important; height:1px!important; padding:0!important; margin:-1px!important; overflow:hidden!important; clip:rect(0,0,0,0)!important; white-space:nowrap!important; border:0!important; }
   .status-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--mint-400); box-shadow:0 0 0 3px rgba(49,197,173,.14); }
 }
 
@@ -277,6 +278,52 @@
   .lab-note { display:flex; gap:8px; margin:0 16px 16px; padding:10px; border-radius:8px; color:#315f9f; background:var(--blue-100); font-size:8px; }
   .entity-bars { padding:0 16px 16px; } .entity-bars h3 { margin:0 0 8px; font-size:10px; } .entity-bars > div { display:grid; grid-template-columns:105px 1fr 40px; align-items:center; gap:8px; margin-top:8px; font-size:8px; } .entity-bars > div > i { height:6px; border-radius:6px; background:var(--ink-100); overflow:hidden; } .entity-bars b { display:block; height:100%; border-radius:6px; background:var(--mint-500); transition:width .6s var(--ease); }
 
+  /* protected doctor-booking bot */
+  .doctor-bot-launcher { position:fixed; z-index:120; right:22px; bottom:22px; min-width:245px; display:grid; grid-template-columns:42px 1fr 9px; align-items:center; gap:10px; padding:9px 13px 9px 9px; border:1px solid #174149; border-radius:17px; color:white; background:var(--ink-950); box-shadow:0 18px 48px rgba(7,24,33,.24); text-align:left; }
+  .doctor-bot-launcher > span:first-child { width:42px; height:42px; display:grid; place-items:center; border-radius:13px; color:var(--mint-100); background:var(--mint-700); }
+  .doctor-bot-launcher > span:nth-child(2) { display:flex; flex-direction:column; } .doctor-bot-launcher strong { font-size:11px; } .doctor-bot-launcher small { color:#8ca6ab; font-size:8px; }
+  .doctor-bot-launcher > i { width:8px; height:8px; border-radius:50%; background:var(--mint-400); box-shadow:0 0 0 4px rgba(49,197,173,.12); }
+  .doctor-bot-panel { position:fixed; z-index:120; right:22px; bottom:22px; width:min(440px,calc(100vw - 44px)); height:min(760px,calc(100dvh - 44px)); display:flex; flex-direction:column; border:1px solid var(--ink-200); border-radius:20px; background:white; box-shadow:0 24px 70px rgba(7,24,33,.26); overflow:hidden; animation:doctorBotIn .24s var(--ease); }
+  @keyframes doctorBotIn { from { opacity:0; transform:translateY(10px) scale(.98); } }
+  .doctor-bot-header { min-height:86px; display:grid; grid-template-columns:42px minmax(0,1fr) 28px 28px 28px; align-items:center; gap:5px; padding:12px 12px 12px 15px; color:white; background:var(--ink-950); }
+  .doctor-bot-logo { width:40px; height:45px; display:grid; place-items:center; color:var(--mint-400); }
+  .doctor-bot-header > span:nth-child(2) { min-width:0; display:flex; flex-direction:column; } .doctor-bot-header strong { font-size:14px; letter-spacing:-.2px; } .doctor-bot-header small { color:#8aa5aa; font-size:8px; } .doctor-bot-header em { display:flex; align-items:center; gap:6px; margin-top:5px; color:#a9bfc2; font-size:7px; font-style:normal; } .doctor-bot-header em i { width:7px; height:7px; border-radius:50%; background:var(--mint-400); }
+  .doctor-bot-header button { width:28px; height:28px; display:grid; place-items:center; padding:0; border:0; border-radius:8px; color:#8fa9ad; background:transparent; } .doctor-bot-header button:hover { color:white; background:rgba(255,255,255,.07); }
+  .doctor-bot-protected { min-height:39px; display:flex; align-items:center; gap:7px; padding:0 15px; color:var(--mint-900); background:var(--mint-50); border-bottom:1px solid var(--mint-100); }
+  .doctor-bot-protected strong { font-size:8px; letter-spacing:.35px; text-transform:uppercase; } .doctor-bot-protected span { margin-left:auto; color:#55756f; font-size:7px; }
+  .doctor-bot-steps { min-height:59px; display:grid; grid-template-columns:repeat(3,1fr); padding:8px 24px 6px; background:var(--ink-50); border-bottom:1px solid var(--ink-150); }
+  .doctor-bot-steps > div { position:relative; display:flex; flex-direction:column; align-items:center; gap:2px; color:var(--ink-500); font-size:7px; font-weight:750; }
+  .doctor-bot-steps > div:not(:last-child)::after { content:""; position:absolute; top:12px; left:calc(50% + 14px); width:calc(100% - 28px); height:2px; background:var(--ink-200); }
+  .doctor-bot-steps i { position:relative; z-index:1; width:25px; height:25px; display:grid; place-items:center; border-radius:50%; color:var(--ink-600); background:var(--ink-200); font-size:8px; font-style:normal; font-weight:850; }
+  .doctor-bot-steps .active { color:var(--mint-900); } .doctor-bot-steps .active i { color:white; background:var(--mint-600); } .doctor-bot-steps .active:not(:last-child)::after { background:var(--mint-200); }
+  .doctor-bot-chat { flex:1; min-height:0; display:flex; flex-direction:column; gap:9px; padding:13px 14px 16px; background:#fbfdfd; overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--ink-300) transparent; }
+  .doctor-bot-message { max-width:88%; padding:10px 11px; border:1px solid var(--ink-150); border-radius:13px; background:var(--ink-50); }
+  .doctor-bot-message.user { align-self:flex-end; color:white; border-color:var(--mint-700); background:var(--mint-700); }
+  .doctor-bot-message small { display:block; margin-bottom:3px; color:var(--mint-700); font-size:6.5px; font-weight:850; letter-spacing:.45px; text-transform:uppercase; } .doctor-bot-message.user small { color:#c7f6ec; }
+  .doctor-bot-message p { margin:0; font-size:9px; line-height:1.45; }
+  .doctor-bot-command-intro { display:flex; flex-direction:column; gap:6px; }
+  .doctor-bot-command-intro > span { color:var(--ink-500); font-size:7px; font-weight:800; letter-spacing:.45px; text-transform:uppercase; } .doctor-bot-command-intro > div { display:flex; gap:5px; overflow-x:auto; scrollbar-width:none; }
+  .doctor-bot-command-intro button { min-height:29px; flex:0 0 auto; padding:0 9px; border:1px solid var(--ink-200); border-radius:99px; color:var(--ink-700); background:white; font-size:7px; font-weight:750; }
+  .doctor-bot-protection { padding:10px 11px; border:1px solid var(--mint-200); border-radius:13px; color:var(--ink-800); background:var(--mint-50); }
+  .doctor-bot-protection header { display:flex; align-items:center; gap:6px; color:var(--mint-900); } .doctor-bot-protection header strong { font-size:7px; letter-spacing:.35px; text-transform:uppercase; }
+  .doctor-bot-protection p { margin:6px 0; font-family:"SFMono-Regular",Consolas,monospace; font-size:8px; line-height:1.5; overflow-wrap:anywhere; }
+  .doctor-bot-protection footer { display:flex; flex-wrap:wrap; gap:4px 8px; color:var(--ink-500); font-size:6.5px; } .doctor-bot-protection footer span:not(:last-child)::after { content:" ·"; }
+  .doctor-bot-protection.held { border-color:#ead39d; background:#fff9eb; } .doctor-bot-protection.held header { color:var(--amber-700); }
+  .doctor-bot-safety { display:grid; grid-template-columns:auto 1fr 1fr; align-items:center; gap:6px; color:var(--amber-700); }
+  .doctor-bot-safety button { min-height:29px; padding:0 7px; border:1px solid #ead39d; border-radius:99px; color:var(--amber-700); background:#fff8e7; font-size:6.8px; font-weight:800; } .doctor-bot-safety button:last-child { color:var(--mint-900); border-color:var(--mint-200); background:var(--mint-50); }
+  .doctor-bot-slot { display:grid; grid-template-columns:36px minmax(0,1fr) auto; align-items:center; gap:9px; padding:9px 10px; border:1px solid #c8daf5; border-radius:13px; background:#f4f8ff; }
+  .doctor-bot-slot > span { width:34px; height:34px; display:grid; place-items:center; border-radius:50%; color:var(--blue-600); background:var(--blue-100); }
+  .doctor-bot-slot > div { min-width:0; display:flex; flex-direction:column; } .doctor-bot-slot strong { font-size:8px; } .doctor-bot-slot small { display:flex; align-items:center; gap:4px; color:var(--ink-500); font-size:6.5px; }
+  .doctor-bot-slot button { min-height:29px; padding:0 10px; border:0; border-radius:99px; color:white; background:var(--blue-600); font-size:7px; font-weight:800; }
+  .doctor-bot-booked { display:flex; align-items:flex-start; gap:8px; padding:10px 11px; border:1px solid var(--mint-200); border-radius:13px; color:var(--mint-900); background:var(--mint-50); } .doctor-bot-booked span { display:flex; flex-direction:column; } .doctor-bot-booked strong { font-size:8px; } .doctor-bot-booked p { margin:2px 0 0; color:var(--ink-700); font-size:8px; line-height:1.45; }
+  .doctor-bot-voice-state,.doctor-bot-error { display:flex; align-items:center; gap:8px; padding:8px 9px; border-radius:9px; color:var(--mint-900); background:var(--mint-50); font-size:7px; }
+  .doctor-bot-error { align-items:flex-start; color:var(--red-700); background:var(--red-100); }
+  .voice-bars { height:21px; display:flex; align-items:center; gap:2px; } .voice-bars i { width:2px; border-radius:2px; background:var(--mint-500); animation:botWave .65s ease-in-out infinite alternate; } .voice-bars i:nth-child(even) { animation-delay:.18s; } @keyframes botWave { to { height:4px!important; opacity:.45; } }
+  .doctor-bot-compose { position:relative; display:grid; grid-template-columns:minmax(0,1fr) 38px 38px; gap:6px; padding:10px 12px 24px; border-top:1px solid var(--ink-200); background:white; }
+  .doctor-bot-compose label { min-width:0; } .doctor-bot-compose input { width:100%; height:38px; padding:0 13px; border:1px solid var(--ink-200); border-radius:99px; background:var(--ink-50); font-size:8px; } .doctor-bot-compose input:focus { border-color:var(--mint-500); background:white; outline:3px solid rgba(11,174,151,.14); }
+  .doctor-bot-compose > button { width:38px; height:38px; display:grid; place-items:center; padding:0; border:0; border-radius:50%; color:white; background:var(--mint-600); } .doctor-bot-compose > button:last-of-type { background:var(--blue-600); } .doctor-bot-compose > button:disabled { opacity:.45; cursor:not-allowed; } .doctor-bot-compose > button.recording { background:var(--red-500); animation:botRecord 1s ease-in-out infinite alternate; } @keyframes botRecord { to { box-shadow:0 0 0 7px rgba(223,89,96,.13); } }
+  .doctor-bot-compose > small { position:absolute; left:15px; bottom:6px; display:flex; align-items:center; gap:4px; color:var(--ink-500); font-size:6.3px; }
+
   /* settings */
   .settings-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(300px,.58fr); gap:16px; align-items:start; }
   .deployment-list { padding:5px 14px; } .deployment-list > div { display:flex; align-items:center; gap:9px; padding:10px 0; border-bottom:1px solid var(--ink-150); } .deployment-list i { width:29px; height:29px; display:grid; place-items:center; border-radius:8px; color:var(--mint-700); background:var(--mint-50); font-style:normal; } .deployment-list > div > span { flex:1; display:flex; flex-direction:column; } .deployment-list strong { font-size:9px; } .deployment-list small { color:var(--ink-500); font-size:7px; } .deployment-list em { color:var(--mint-700); font-size:7px; font-style:normal; font-weight:800; }
@@ -327,6 +374,8 @@
     .connection-grid,.lab-grid { grid-template-columns:1fr; } .metric-grid { grid-template-columns:repeat(2,1fr); }
     .modal-backdrop { align-items:end; padding:0; } .modal { max-height:92vh; border-radius:17px 17px 0 0; }
     .toast { left:12px; right:12px; bottom:79px; min-width:0; }
+    .doctor-bot-launcher { right:12px; bottom:79px; }
+    .doctor-bot-panel { right:10px; bottom:77px; width:min(430px,calc(100vw - 20px)); height:min(680px,calc(100dvh - 89px)); }
   }
   @media (max-width:430px) {
     .edge-chip { width:40px; padding:0 12px; } .edge-chip > span:not(.status-dot),.edge-chip svg { display:none; }
@@ -336,6 +385,17 @@
     .metric-grid { padding:12px; gap:7px; }
     .policy-footer { align-items:flex-start; flex-direction:column; }
     .setting-rows > div { align-items:flex-start; flex-direction:column; padding:10px 0; gap:8px; } .setting-rows select { width:100%; }
+    .doctor-bot-launcher { left:9px; right:9px; bottom:76px; min-width:0; }
+    .doctor-bot-panel { inset:6px 6px calc(73px + env(safe-area-inset-bottom)); width:auto; height:auto; border-radius:16px; }
+    .doctor-bot-header { min-height:74px; grid-template-columns:37px minmax(0,1fr) 32px 32px 32px; padding:8px 8px 8px 11px; }
+    .doctor-bot-logo { width:35px; height:39px; } .doctor-bot-header strong { font-size:13px; } .doctor-bot-header button { width:32px; height:32px; }
+    .doctor-bot-protected { min-height:35px; padding:0 11px; } .doctor-bot-protected span { max-width:46%; text-align:right; }
+    .doctor-bot-steps { min-height:54px; padding:7px 16px 5px; }
+    .doctor-bot-chat { padding:10px 10px 13px; }
+    .doctor-bot-message { max-width:94%; }
+    .doctor-bot-safety { grid-template-columns:auto 1fr; } .doctor-bot-safety svg { grid-row:1 / 3; }
+    .doctor-bot-slot { grid-template-columns:34px minmax(0,1fr); } .doctor-bot-slot button { grid-column:1 / -1; width:100%; }
+    .doctor-bot-compose { grid-template-columns:minmax(0,1fr) 38px 38px; padding-left:8px; padding-right:8px; }
   }
   @media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important; animation-duration:.001ms!important; animation-iteration-count:1!important; transition-duration:.001ms!important; } }
 }

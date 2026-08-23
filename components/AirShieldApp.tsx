@@ -12,6 +12,7 @@ import { AuditTrail } from "./views/AuditTrail";
 import { Connections } from "./views/Connections";
 import { PerformanceLab } from "./views/PerformanceLab";
 import { SettingsView } from "./views/SettingsView";
+import { DoctorBookingBot } from "./DoctorBookingBot";
 
 export function AirShieldApp() {
   const [view, setView] = useState<ViewId>("overview");
@@ -19,15 +20,18 @@ export function AirShieldApp() {
   const [toast, setToast] = useState("");
   useEffect(()=>{ if(!toast) return; const id=setTimeout(()=>setToast(""),3200); return ()=>clearTimeout(id); },[toast]);
   const props = { navigate: setView, notify: setToast };
-  return <AppShell view={view} setView={setView} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}>
-    {view === "overview" && <Overview {...props}/>}
-    {view === "live" && <LiveShield notify={setToast}/>}
-    {view === "policies" && <PolicyStudio notify={setToast}/>}
-    {view === "vault" && <TokenVault notify={setToast}/>}
-    {view === "audit" && <AuditTrail notify={setToast}/>}
-    {view === "connections" && <Connections notify={setToast}/>}
-    {view === "lab" && <PerformanceLab notify={setToast}/>}
-    {view === "settings" && <SettingsView notify={setToast}/>}
-    {toast && <Toast message={toast} onClose={()=>setToast("")}/>}
-  </AppShell>;
+  return <>
+    <AppShell view={view} setView={setView} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}>
+      {view === "overview" && <Overview {...props}/>}
+      {view === "live" && <LiveShield notify={setToast}/>}
+      {view === "policies" && <PolicyStudio notify={setToast}/>}
+      {view === "vault" && <TokenVault notify={setToast}/>}
+      {view === "audit" && <AuditTrail notify={setToast}/>}
+      {view === "connections" && <Connections notify={setToast}/>}
+      {view === "lab" && <PerformanceLab notify={setToast}/>}
+      {view === "settings" && <SettingsView notify={setToast}/>}
+      {toast && <Toast message={toast} onClose={()=>setToast("")}/>}
+    </AppShell>
+    <DoctorBookingBot notify={setToast}/>
+  </>;
 }

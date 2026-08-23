@@ -78,6 +78,8 @@ Open `http://localhost:4174`.
 
 This mode demonstrates all responsive screens, sector scenarios, policies, vault concepts, evidence, connections, and performance views. The **Try the protection API** card uses the development-only local detector and masks entered names, contextual account IDs, phone values, email addresses, and the other deterministic patterns. Select **Run sample** to show clearly labelled synthetic raw/protected transcript pairs. Actual microphone transcription requires the self-hosted voice edge described below; the UI deliberately does not fall back to a browser/vendor speech-recognition service.
 
+The initially open **CareShield Assistant** adds a protected virtual-intake flow without replacing any AirShield screen. Enter only synthetic symptoms: the raw text appears in a local-only bubble while the RIA demo receives the protected result with entity count, decision, and receipt. Its general-physician slot and reservation are synthetic; it performs no diagnosis, emergency care, clinical record creation, or real booking. Minimize the widget to inspect the underlying product.
+
 ## 7. Full local Docker Compose stack
 
 ```bash
@@ -278,6 +280,8 @@ The exporter verifies the chain, persisted tail, and signatures before writing m
 
 For deeper review, start with:
 
+- `docs/AirShield_Requirements_and_Runbook.pdf`
+- `docs/AirShield_CEO_Technical_Briefing.pdf`
 - `docs/PRODUCTION_ARCHITECTURE.md`
 - `docs/THREAT_MODEL.md`
 - `docs/MODEL_ASSURANCE.md`
