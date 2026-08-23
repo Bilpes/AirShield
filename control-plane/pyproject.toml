@@ -35,7 +35,7 @@ dev = [
   "aiosqlite==0.21.0",
   "ruff==0.12.9",
   "mypy==1.17.1",
-  "types-PyYAML==6.0.12.20250822",
+  "types-PyYAML==6.0.12.20260815",
   # Edge route import/integration tests; not required by the control-plane runtime.
   "python-multipart==0.0.32",
   "pip-audit==2.9.0"
