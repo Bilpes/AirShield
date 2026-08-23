@@ -60,6 +60,6 @@ jobs:
       - run: kubectl kustomize deploy/kubernetes/base > /tmp/base.yaml
       - run: kubectl kustomize deploy/kubernetes/overlays/azure > /tmp/azure.yaml
       - run: kubectl kustomize deploy/kubernetes/overlays/openbao > /tmp/openbao.yaml
-      - uses: azure/cli@d4515bc8e518874d3c814bf5c307a1cb08ec9b35 # v2
+      - uses: azure/cli@9f7ce6f37c31b777ec6c6b6d1dfe7db79f497956 # v2
         with:
           inlineScript: az bicep build --file deploy/azure/main.bicep
