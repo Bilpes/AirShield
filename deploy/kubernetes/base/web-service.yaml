@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: airshield-web
+  namespace: airshield
+spec:
+  type: ClusterIP
+  selector: {app.kubernetes.io/name: airshield-web}
+  ports:
+    - {name: https, port: 443, targetPort: secure}

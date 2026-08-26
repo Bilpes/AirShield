@@ -1,0 +1,9 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: airshield-control-plane
+  namespace: airshield
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels: {app.kubernetes.io/name: airshield-control-plane}

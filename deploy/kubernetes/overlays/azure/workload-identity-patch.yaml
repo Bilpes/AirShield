@@ -1,0 +1,115 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: airshield-control-plane
+  namespace: airshield
+  annotations:
+    azure.workload.identity/client-id: REPLACE_MANAGED_IDENTITY_CLIENT_ID
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: airshield-web
+  namespace: airshield
+  annotations:
+    azure.workload.identity/client-id: REPLACE_WEB_MANAGED_IDENTITY_CLIENT_ID
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airshield-control-plane
+  namespace: airshield
+spec:
+  template:
+    metadata:
+      labels:
+        azure.workload.identity/use: "true"
+    spec:
+      containers:
+        - name: control-plane
+          envFrom:
+            - configMapRef: {name: airshield-control-plane}
+            - configMapRef: {name: airshield-azure-settings}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+            - {name: database-secret, mountPath: /mnt/secrets-store, readOnly: true}
+      volumes:
+        - name: database-secret
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes: {secretProviderClass: airshield-key-vault}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airshield-web
+  namespace: airshield
+spec:
+  template:
+    metadata:
+      labels:
+        azure.workload.identity/use: "true"
+      annotations:
+        azure.workload.identity/skip-containers: tls-proxy
+    spec:
+      containers:
+        - name: web
+          env:
+            - {name: AIRSHIELD_RUNTIME_MODE, value: production}
+            - {name: CONTROL_PLANE_URL, value: http://airshield-control-plane:8080}
+            - {name: CONTROL_PLANE_SCOPE, value: api://airshield-control-plane/.default}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: airshield-edge
+  namespace: airshield
+  annotations:
+    azure.workload.identity/client-id: REPLACE_EDGE_MANAGED_IDENTITY_CLIENT_ID
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airshield-edge
+  namespace: airshield
+spec:
+  template:
+    metadata:
+      labels:
+        azure.workload.identity/use: "true"
+    spec:
+      containers:
+        - name: edge
+          env:
+            - {name: CONTROL_PLANE_SCOPE, value: api://airshield-control-plane/.default}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: airshield-gateway
+  namespace: airshield
+  annotations:
+    azure.workload.identity/client-id: REPLACE_GATEWAY_MANAGED_IDENTITY_CLIENT_ID
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airshield-gateway
+  namespace: airshield
+spec:
+  template:
+    metadata:
+      labels:
+        azure.workload.identity/use: "true"
+    spec:
+      containers:
+        - name: gateway
+          volumeMounts:
+            - {name: gateway-secrets-store, mountPath: /mnt/gateway-secrets, readOnly: true}
+      volumes:
+        - name: gateway-secrets-store
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes: {secretProviderClass: airshield-gateway-secrets}

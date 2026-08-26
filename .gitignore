@@ -1,0 +1,54 @@
+# JavaScript / Next.js
+node_modules/
+.next/
+out/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+build/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+!**/.env.example
+# Intentionally committed non-secret hackathon defaults. Never place credentials in this file.
+!/.env.local
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.token
+!deploy/dev/control-plane.token
+
+# Local databases, models, and generated evidence
+*.db
+*.sqlite
+*.sqlite3
+models/
+*.onnx
+*.bin
+*.safetensors
+*.pt
+*.pth
+*.jsonl.sha256
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Generated deliverables
+AirShield-source-*.zip

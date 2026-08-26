@@ -1,0 +1,17 @@
+# Kubernetes deployment
+
+`base` is the hardened web, trusted WebSocket gateway, English voice-edge, and control-plane baseline. `overlays/azure` uses Azure Workload Identity and Key Vault CSI. `overlays/openbao` uses a Kubernetes-authenticated OpenBao Agent and Transit. The manifests intentionally contain non-runnable image and identity placeholders so an unreviewed image cannot be deployed accidentally.
+
+## Required release steps
+
+1. Replace every `REPLACE_*` value; build the web image with the exact external `wss://.../ws/voice` gateway URL (never the private edge or the development insecure-edge flag); pin signed images/sidecars by digest and verify signatures in admission policy.
+2. Provide `airshield-database` (with `ssl=verify-full&sslrootcert=/var/run/secrets/database/ca.crt`), `airshield-database-ca`, `airshield-index-key`, `airshield-edge-gateway` (distinct `current` and `previous` keys), and the `airshield-web-tls`, `airshield-gateway-tls`, `airshield-edge-tls`, and `airshield-control-plane-tls` private certificates/CAs through approved secret and certificate controllers. Do not commit them. The certificates must cover the web/gateway hosts or services, `airshield-edge`, and `airshield-control-plane` DNS names respectively. The included trusted gateway reconstructs the browser protocol, validates the private CA, and injects the edge secret; expose the gateway—not the edge—through a TLS/WSS ingress with aggregate WAF/DDoS/rate controls.
+3. Configure the trusted host/ingress to issue a short-lived Secure, HttpOnly OIDC session cookie on the gateway domain. Keep JWTs out of WebSocket URLs and logs; use one expected tenant per gateway/edge workload deployment.
+4. Provision the `airshield-models` PVC with the signed release's English ASR/diarization files and canonical manifest, then replace `MODEL_MANIFEST_SHA256` with the promoted digest. Startup verifies every regular artifact and rejects symlinks, incomplete coverage, or tampering; production pods do not download models from the internet.
+5. Set real OIDC issuer, JWKS, audience, CORS origin, tenant claim, destinations, and key identifiers. For portable projected tokens, replace the exact service-account subject mappings in `WORKLOAD_BINDINGS_JSON`; never use wildcard subjects or grant administrative/reidentification scopes to web/edge workloads.
+6. Render with `kubectl kustomize`, validate with kubeconform/policy-as-code, then test in a production-like private cluster.
+7. Apply `control-plane/migrations` as an approved one-shot job before rollout.
+8. Verify NetworkPolicy behavior with the cluster CNI. Label only the approved private ingress namespace `airshield.network/ingress=true`. The base allows DNS, same-namespace service traffic, and selected RFC1918 TLS/PostgreSQL/OpenBao paths; adapt CIDRs to the landing zone. Standard NetworkPolicy does not provide FQDN filtering.
+9. Export evidence off-cluster to an immutable, retention-locked destination and test restore, key rotation, live-row deletion, backup expiry, and dual-control workflows.
+
+The `postgresql` directory is a single-node portability fixture, not a production HA database. Use Azure PostgreSQL Flexible Server or a reviewed PostgreSQL operator with synchronous HA, `ssl=verify-full` hostname/CA validation, PITR, encrypted backups, restore tests, monitoring, and dedicated credentials. If the fixture is used for non-production testing, create `airshield-postgresql-bootstrap` and `airshield-postgresql-tls` secrets outside source control.

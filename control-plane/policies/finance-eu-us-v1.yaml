@@ -1,0 +1,17 @@
+id: finance-eu-us-v1
+version: "1.0.0"
+language: en
+mapping_ttl_minutes: 240
+raw_buffer_ttl_seconds: 15
+review_below_threshold: false
+legal_tags: [GDPR, DORA, PCI-DSS-4.0.1]
+allowed_destinations: [agent-assist-local, fraud-review, approved-finance-llm]
+entities:
+  PERSON: {action: tokenize, threshold: 0.84, critical: true}
+  CARD_OR_ACCOUNT: {action: tokenize, threshold: 0.92, critical: true}
+  PAN: {action: tokenize, threshold: 0.96, critical: true}
+  IFSC: {action: tokenize, threshold: 0.95, critical: true}
+  PHONE: {action: mask, threshold: 0.92, critical: true}
+  EMAIL: {action: mask, threshold: 0.95, critical: true}
+  ADDRESS: {action: generalize, threshold: 0.88, critical: false}
+  DATE_TIME: {action: tokenize, threshold: 0.90, critical: false}

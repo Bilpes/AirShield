@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airshield-control-plane
+  namespace: airshield
+data:
+  ENVIRONMENT: production
+  AUTH_MODE: oidc
+  FAIL_CLOSED: "true"
+  ALLOW_RAW_IN_API: "false"
+  AUDIT_EXPORT_REQUIRED: "true"
+  POLICY_DIRECTORY: /service/policies
+  MAX_TEXT_BYTES: "262144"
+  EVIDENCE_RETENTION_DAYS: "2555"
+  ALLOWED_ORIGINS: https://airshield.internal.example
+  OIDC_ISSUER: https://issuer.example.invalid/
+  OIDC_AUDIENCE: api://airshield-control-plane
+  OIDC_JWKS_URL: https://issuer.example.invalid/.well-known/jwks.json
+  TENANT_CLAIM: tid
+  WORKLOAD_BINDINGS_JSON: '{}'
+  KEY_PROVIDER: azure

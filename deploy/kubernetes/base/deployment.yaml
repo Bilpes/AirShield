@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airshield-control-plane
+  namespace: airshield
+  labels: {app.kubernetes.io/name: airshield-control-plane}
+spec:
+  replicas: 3
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxUnavailable: 0, maxSurge: 1}
+  selector:
+    matchLabels: {app.kubernetes.io/name: airshield-control-plane}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: airshield-control-plane}
+      annotations:
+        container.apparmor.security.beta.kubernetes.io/control-plane: runtime/default
+    spec:
+      serviceAccountName: airshield-control-plane
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: {app.kubernetes.io/name: airshield-control-plane}
+      containers:
+        - name: control-plane
+          image: ghcr.io/example/airshield-control-plane@sha256:REPLACE_WITH_SIGNED_IMAGE_DIGEST
+          imagePullPolicy: IfNotPresent
+          command: [uvicorn]
+          args:
+            - app.main:app
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8080"
+            - --ssl-certfile
+            - /var/run/secrets/control-plane-tls/tls.crt
+            - --ssl-keyfile
+            - /var/run/secrets/control-plane-tls/tls.key
+            - --no-proxy-headers
+          ports:
+            - {name: https, containerPort: 8080, protocol: TCP}
+          envFrom:
+            - configMapRef: {name: airshield-control-plane}
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef: {name: airshield-database, key: url}
+            - name: TOKEN_INDEX_KEY_B64
+              valueFrom:
+                secretKeyRef: {name: airshield-index-key, key: value}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          resources:
+            requests: {cpu: 500m, memory: 768Mi}
+            limits: {cpu: "2", memory: 2Gi}
+          startupProbe:
+            httpGet: {path: /v1/health/ready, port: https, scheme: HTTPS}
+            failureThreshold: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: {path: /v1/health/ready, port: https, scheme: HTTPS}
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: {path: /v1/health/live, port: https, scheme: HTTPS}
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+            - {name: control-plane-tls, mountPath: /var/run/secrets/control-plane-tls, readOnly: true}
+            - {name: database-ca, mountPath: /var/run/secrets/database, readOnly: true}
+      volumes:
+        - name: tmp
+          emptyDir: {sizeLimit: 256Mi}
+        - name: control-plane-tls
+          secret:
+            secretName: airshield-control-plane-tls
+            defaultMode: 0440
+            items:
+              - {key: tls.crt, path: tls.crt}
+              - {key: tls.key, path: tls.key}
+        - name: database-ca
+          secret:
+            secretName: airshield-database-ca
+            defaultMode: 0444
+            items:
+              - {key: ca.crt, path: ca.crt}

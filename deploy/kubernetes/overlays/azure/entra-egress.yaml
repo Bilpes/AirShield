@@ -1,0 +1,19 @@
+# Standard NetworkPolicy cannot select Entra FQDNs. Restrict this HTTPS rule to
+# login.microsoftonline.com with Azure Firewall/Cilium FQDN policy in the landing zone.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: airshield-entra-https-egress
+  namespace: airshield
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values: [airshield-web, airshield-gateway, airshield-edge, airshield-control-plane]
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - ipBlock: {cidr: 0.0.0.0/0}
+      ports:
+        - {protocol: TCP, port: 443}

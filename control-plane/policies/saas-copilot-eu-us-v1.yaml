@@ -1,0 +1,16 @@
+id: saas-copilot-eu-us-v1
+version: "1.0.0"
+language: en
+mapping_ttl_minutes: 60
+raw_buffer_ttl_seconds: 0
+review_below_threshold: false
+legal_tags: [GDPR, NIS2-readiness, SOC2-readiness]
+allowed_destinations: [ollama-local, enterprise-copilot, approved-code-llm]
+entities:
+  PERSON: {action: tokenize, threshold: 0.84, critical: false}
+  ORGANIZATION: {action: tokenize, threshold: 0.82, critical: false}
+  EMAIL: {action: mask, threshold: 0.95, critical: true}
+  PHONE: {action: mask, threshold: 0.92, critical: false}
+  IP_ADDRESS: {action: tokenize, threshold: 0.95, critical: true}
+  SECRET: {action: redact, threshold: 0.98, critical: true}
+  CARD_OR_ACCOUNT: {action: tokenize, threshold: 0.92, critical: true}
