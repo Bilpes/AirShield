@@ -86,11 +86,11 @@ interface ActionResponse {
 }
 
 const SYNTHETIC_INPUTS: Record<Industry, string> = {
-  Healthcare: "I am Jordan Lee, phone 555-010-8832. I have had a headache since yesterday and need a virtual appointment tomorrow at 10:00 AM.",
-  Finance: "I am Morgan Reed. Account 492188407721 shows a disputed transfer of 45000 to Taylor Chen. Open a review and contact me at morgan@example.com.",
-  Insurance: "I am Casey Patel. Policy LC-MTR-884201 and vehicle KA03MX4821 were involved in an accident yesterday near Lake View Avenue.",
-  "BPO / Contact center": "I am Sana Chawla. Account 7744001288 was charged twice. Create a refund review and send confirmation to sana@example.com.",
-  "SaaS / Copilot": "Customer Orion Labs, ID CUS-884201, reported an incident on prod-db-07.internal. Create a restricted ticket for Mina Hall.",
+  Healthcare: "I am Jordan Lee, phone 555-010-8832 and SSN 123-45-6789. My balance in my health account is 2500 rupees. I have had a headache since yesterday and need a virtual appointment tomorrow at 10:00 AM.",
+  Finance: "I am Morgan Reed. Card 4111111111111111 shows a balance of 15000 dollars. Account 492188407721 shows a disputed transfer of 45000 to Taylor Chen. Open a review and contact me at morgan@example.com.",
+  Insurance: "I am Casey Patel. Policy LC-MTR-884201, vehicle KA03MX4821, and my driving license DL-1234567890 were involved in an accident yesterday near Lake View Avenue.",
+  "BPO / Contact center": "I am Sana Chawla. Account 7744001288 was charged twice for 2999 rupees. My card 5555555555554444 shows unusual activity. Create a refund review and send confirmation to sana@example.com.",
+  "SaaS / Copilot": "Customer Orion Labs, ID CUS-884201, reported an incident on prod-db-07.internal with IP 192.168.1.100. The affected systems show a balance of 50000 credits. Create a restricted ticket for Mina Hall at mina@orionlabs.com.",
 };
 
 const PRIORITIES = [
