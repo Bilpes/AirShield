@@ -70,6 +70,7 @@ export function DoctorBookingBot({ notify }: { notify: (message: string) => void
   const [recording, setRecording] = useState(false);
   const [voiceDraft, setVoiceDraft] = useState("");
   const [voiceError, setVoiceError] = useState("");
+  const [voiceAvailable, setVoiceAvailable] = useState<boolean | null>(null);
   const session = useRef<string | null>(null);
   const list = useRef<HTMLDivElement>(null);
   const stream = useRef<MediaStream | null>(null);
@@ -94,6 +95,29 @@ export function DoctorBookingBot({ notify }: { notify: (message: string) => void
     },
     [],
   );
+
+  // Check if edge service is available for voice
+  useEffect(() => {
+    if (voiceAvailable !== null) return;
+    const url = edgeUrl();
+    if (!url) {
+      setVoiceAvailable(false);
+      return;
+    }
+    // ws://localhost:8001/ws/voice -> http://localhost:8001/v1/health
+    const healthUrl = url.replace(/^ws:/, "http:").replace(/\/ws\/voice$/, "/v1/health");
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    fetch(healthUrl, { method: "GET", signal: controller.signal })
+      .then(res => {
+        clearTimeout(timeout);
+        setVoiceAvailable(res.ok);
+      })
+      .catch(() => {
+        clearTimeout(timeout);
+        setVoiceAvailable(false);
+      });
+  }, [voiceAvailable]);
 
   async function ensureSession(): Promise<string> {
     if (session.current) return session.current;
@@ -483,11 +507,12 @@ export function DoctorBookingBot({ notify }: { notify: (message: string) => void
         </>}
         {voiceDraft && <div className="doctor-bot-voice-state"><span className="voice-bars">{[5,11,17,8,14,19,7,13].map((height,index)=><i key={index} style={{height}}/>)}</span><span>{voiceDraft}</span></div>}
         {voiceError && <div className="doctor-bot-error" role="alert"><AlertTriangle size={13}/><span>{voiceError}</span></div>}
+        {voiceAvailable === false && !voiceDraft && !voiceError && <div className="doctor-bot-error" role="alert"><AlertTriangle size={13}/><span>Voice requires Docker. Run: docker compose up. Use text input instead.</span></div>}
       </div>
 
       <form className="doctor-bot-compose" onSubmit={submit}>
         <label><span className="sr-only">Doctor booking command</span><input value={input} onChange={(event)=>setInput(event.target.value)} placeholder="Type symptoms or booking request…" maxLength={4000}/></label>
-        <button type="button" className={recording?"recording":""} onClick={recording?stopVoice:startVoice} aria-label={recording?"Stop voice command":"Start protected voice command"}>{recording?<CircleStop size={18}/>:<Mic size={18}/>}</button>
+        <button type="button" className={recording?"recording":""} onClick={recording?stopVoice:startVoice} disabled={voiceAvailable === false && !recording} title={voiceAvailable === false ? "Voice requires Docker. Use text input." : "Protected voice command"} aria-label={recording?"Stop voice command":"Start protected voice command"}>{recording?<CircleStop size={18}/>:<Mic size={18}/>}</button>
         <button type="submit" disabled={busy||recording||!input.trim()} aria-label="Protect and send booking command"><Send size={18}/></button>
         <small><ShieldCheck size={11}/>Only protected text enters the RIA and trusted booking demonstration path.</small>
       </form>
