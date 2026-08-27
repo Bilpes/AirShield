@@ -18,6 +18,7 @@ export function LiveShield({ notify }: { notify: (m: string) => void }) {
   const [captureMode, setCaptureMode] = useState<"none" | "live" | "sample">("none");
   const [voiceState, setVoiceState] = useState<"idle" | "connecting" | "listening" | "paused" | "processing" | "complete" | "error">("idle");
   const [voiceError, setVoiceError] = useState("");
+  const [edgeAvailable, setEdgeAvailable] = useState<boolean | null>(null);
   const [input, setInput] = useState("Customer jack, account 123456789, called from +91 123456789 and email jack@example.com.");
   const [protection, setProtection] = useState<ProtectionResult | null>(null);
   const [summary, setSummary] = useState("");
@@ -45,6 +46,33 @@ export function LiveShield({ notify }: { notify: (m: string) => void }) {
     mediaStream.current?.getTracks().forEach(t=>t.stop());
     socket.current?.close();
   },[]);
+
+  // Check if edge service is available on mount
+  useEffect(()=>{
+    if (edgeAvailable !== null) return; // Already checked
+    const edgeUrl = configuredEdgeUrl();
+    if (!edgeUrl) {
+      setEdgeAvailable(false);
+      return;
+    }
+    // Convert WebSocket URL to HTTP for health check
+    const healthUrl = edgeUrl.replace(/^ws:/, "http:").replace(/\/ws\/voice$/, "/health");
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    fetch(healthUrl, { method: "GET", signal: controller.signal })
+      .then(res => {
+        clearTimeout(timeout);
+        setEdgeAvailable(res.ok);
+        if (!res.ok) {
+          setVoiceError(`Voice edge service at ${new URL(healthUrl).origin} returned status ${res.status}. Start the edge-service: cd edge-service && python main.py`);
+        }
+      })
+      .catch(() => {
+        clearTimeout(timeout);
+        setEdgeAvailable(false);
+        setVoiceError(`Voice edge service is not running at ${new URL(healthUrl).origin}. Start it with: cd edge-service && python main.py`);
+      });
+  }, [edgeAvailable]);
 
   async function ensureControlSession(): Promise<string> {
     if (controlSession.current?.policy === demo.policy) return controlSession.current.id;
@@ -113,13 +141,17 @@ export function LiveShield({ notify }: { notify: (m: string) => void }) {
     if (running || voiceState === "connecting" || voiceState === "processing") return;
     const edgeUrl=configuredEdgeUrl();
     if (!edgeUrl) {
-      let message = "Live capture is not available: ";
-      if (isEdgeConfigured()) {
-        message += "The voice edge service at the configured URL is not responding. Ensure the edge-service is running.";
-      } else {
-        message += "NEXT_PUBLIC_EDGE_WS_URL is not configured. Start the self-hosted voice edge service (edge-service) and set the environment variable to enable live voice capture. Alternatively, use 'Run sample' for demonstration.";
-      }
-      setVoiceState("error"); setVoiceError(message); notify(message); return;
+      setVoiceState("error"); 
+      setVoiceError("NEXT_PUBLIC_EDGE_WS_URL is not configured. Start the self-hosted voice edge service (edge-service) and set the environment variable. Use 'Run sample' for demonstration.");
+      notify("Live capture requires the edge-service to be running. Use 'Run sample' instead.");
+      return;
+    }
+    // Check if edge is available (may have been checked on mount, or we check now)
+    if (edgeAvailable === false) {
+      setVoiceState("error");
+      setVoiceError("Voice edge service is not running. Start it with: cd edge-service && python main.py");
+      notify("Cannot start live capture: edge-service is not running. Use 'Run sample' for demonstration.");
+      return;
     }
     setVoiceState("connecting"); setVoiceError(""); setCaptureMode("live"); setEdgeTurns([]); setTurnCount(0); setElapsed(0); setSummary("");
     expectedSocketClose.current=false;
@@ -249,6 +281,8 @@ export function LiveShield({ notify }: { notify: (m: string) => void }) {
     if(recorder.current?.state !== "inactive") recorder.current?.stop(); recorder.current=null;
     socket.current?.close(); socket.current=null; releaseMicrophone(); controlSession.current=null;
     setRunning(false); setPaused(false); setElapsed(0); setTurnCount(0); setSummary(""); setEdgeTurns([]); setCaptureMode("none"); setVoiceState("idle"); setVoiceError(""); setProtection(null);
+    // Re-check edge availability
+    setEdgeAvailable(null);
   }
   function resetProtection() { setInput(""); setProtection(null); }
   function chooseIndustry(value: Industry) { reset(); setIndustry(value); }
@@ -279,7 +313,7 @@ export function LiveShield({ notify }: { notify: (m: string) => void }) {
 
   return <div className="view">
     <PageIntro title="Voice privacy, live and side by side" description="English voice is captured live, transcribed, diarized, and protected on your own infrastructure before any AI model receives it." actions={<><Button onClick={connectMicrophone} disabled={micConnected||running}><Mic2 size={15}/>{micConnected?"Microphone connected":"Connect microphone"}</Button><Button onClick={reset}><RotateCcw size={15}/>Reset</Button></>}/>
-    <div className="industry-bar"><div><span>Industry policy</span><div>{INDUSTRIES.map(item=><button key={item} onClick={()=>chooseIndustry(item)} className={industry===item?"active":""}>{item}</button>)}</div></div><div className="source-state"><span className={`status-dot ${voiceState==="error"?"error":voiceState==="listening"?"active":""}`}/><span><strong>{captureMode==="sample"?"Clearly labelled sample":voiceState==="listening"?"Live microphone capture":micConnected?"Microphone ready":"Voice edge ready when configured"}</strong><small>English · self-hosted transcription only</small></span></div></div>
+    <div className="industry-bar"><div><span>Industry policy</span><div>{INDUSTRIES.map(item=><button key={item} onClick={()=>chooseIndustry(item)} className={industry===item?"active":""}>{item}</button>)}</div></div><div className="source-state"><span className={`status-dot ${voiceState==="error"?"error":voiceState==="listening"?"active":edgeAvailable===false?"error":""}`}/><span><strong>{captureMode==="sample"?"Clearly labelled sample":voiceState==="listening"?"Live microphone capture":micConnected?"Microphone ready":edgeAvailable===false?"Edge service offline":"Voice edge ready when configured"}</strong><small>{edgeAvailable===false?"Start edge-service: cd edge-service && python main.py":"English · self-hosted transcription only"}</small></span></div></div>
     <div className="live-grid"><div className="live-main">
       <Card className="encounter-card"><div className="session-bar"><div className="session-state"><span className={`record-dot ${running?(paused?"paused":"recording"):voiceState==="processing"?"paused":"idle"}`}/><span><strong>{voiceState==="connecting"?"Connecting to private voice edge":voiceState==="processing"?"Transcribing final audio":voiceState==="complete"?"Capture complete":voiceState==="error"?"Capture needs attention":running?(paused?"Live capture paused":captureMode==="sample"?"Running labelled sample":"Listening and protecting"):"Ready for live English voice"}</strong><small>{captureMode==="sample"?"SAMPLE DATA":`SESSION-${industry.toUpperCase().replace(/\W/g,"").slice(0,6)}`} · {industry} · {demo.policy}</small></span></div><div className="session-time"><div className={`wave ${running&&!paused?"active":""}`}>{[8,16,23,11,18,7,15,21,10,17,6,13,20,9,16].map((h,i)=><i key={i} style={{height:h,animationDelay:`${i*.05}s`}}/>)}</div><strong>{formatTime(elapsed)}</strong></div></div>
         {voiceError&&<div className="voice-error" role="alert"><Radio size={15}/><span><strong>Live capture unavailable</strong><small>{voiceError}</small></span></div>}
