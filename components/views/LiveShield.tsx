@@ -64,13 +64,13 @@ export function LiveShield({ notify }: { notify: (m: string) => void }) {
         clearTimeout(timeout);
         setEdgeAvailable(res.ok);
         if (!res.ok) {
-          setVoiceError(`Voice edge service at ${new URL(healthUrl).origin} returned status ${res.status}. Start the edge-service: cd edge-service && python main.py`);
+          setVoiceError(`Voice edge service returned status ${res.status}. Run: docker compose up`);
         }
       })
       .catch(() => {
         clearTimeout(timeout);
         setEdgeAvailable(false);
-        setVoiceError(`Voice edge service is not running at ${new URL(healthUrl).origin}. Start it with: cd edge-service && python main.py`);
+        setVoiceError(`Voice edge service is not running. Run: docker compose up (starts edge on port 8001)`);
       });
   }, [edgeAvailable]);
 
@@ -142,14 +142,14 @@ export function LiveShield({ notify }: { notify: (m: string) => void }) {
     const edgeUrl=configuredEdgeUrl();
     if (!edgeUrl) {
       setVoiceState("error"); 
-      setVoiceError("NEXT_PUBLIC_EDGE_WS_URL is not configured. Start the self-hosted voice edge service (edge-service) and set the environment variable. Use 'Run sample' for demonstration.");
-      notify("Live capture requires the edge-service to be running. Use 'Run sample' instead.");
+      setVoiceError("NEXT_PUBLIC_EDGE_WS_URL is not configured. Use 'Run sample' for demonstration, or run: docker compose up");
+      notify("Live capture requires Docker. Use 'Run sample' for demonstration.");
       return;
     }
     // Check if edge is available (may have been checked on mount, or we check now)
     if (edgeAvailable === false) {
       setVoiceState("error");
-      setVoiceError("Voice edge service is not running. Start it with: cd edge-service && python main.py");
+      setVoiceError("Voice edge service is not running. Run: docker compose up (starts all services including edge on port 8001)");
       notify("Cannot start live capture: edge-service is not running. Use 'Run sample' for demonstration.");
       return;
     }
@@ -313,7 +313,7 @@ export function LiveShield({ notify }: { notify: (m: string) => void }) {
 
   return <div className="view">
     <PageIntro title="Voice privacy, live and side by side" description="English voice is captured live, transcribed, diarized, and protected on your own infrastructure before any AI model receives it." actions={<><Button onClick={connectMicrophone} disabled={micConnected||running}><Mic2 size={15}/>{micConnected?"Microphone connected":"Connect microphone"}</Button><Button onClick={reset}><RotateCcw size={15}/>Reset</Button></>}/>
-    <div className="industry-bar"><div><span>Industry policy</span><div>{INDUSTRIES.map(item=><button key={item} onClick={()=>chooseIndustry(item)} className={industry===item?"active":""}>{item}</button>)}</div></div><div className="source-state"><span className={`status-dot ${voiceState==="error"?"error":voiceState==="listening"?"active":edgeAvailable===false?"error":""}`}/><span><strong>{captureMode==="sample"?"Clearly labelled sample":voiceState==="listening"?"Live microphone capture":micConnected?"Microphone ready":edgeAvailable===false?"Edge service offline":"Voice edge ready when configured"}</strong><small>{edgeAvailable===false?"Start edge-service: cd edge-service && python main.py":"English · self-hosted transcription only"}</small></span></div></div>
+    <div className="industry-bar"><div><span>Industry policy</span><div>{INDUSTRIES.map(item=><button key={item} onClick={()=>chooseIndustry(item)} className={industry===item?"active":""}>{item}</button>)}</div></div><div className="source-state"><span className={`status-dot ${voiceState==="error"?"error":voiceState==="listening"?"active":edgeAvailable===false?"error":""}`}/><span><strong>{captureMode==="sample"?"Clearly labelled sample":voiceState==="listening"?"Live microphone capture":micConnected?"Microphone ready":edgeAvailable===false?"Docker required for live":"Voice edge ready"}</strong><small>{edgeAvailable===false?"Run: docker compose up":"English · self-hosted transcription only"}</small></span></div></div>
     <div className="live-grid"><div className="live-main">
       <Card className="encounter-card"><div className="session-bar"><div className="session-state"><span className={`record-dot ${running?(paused?"paused":"recording"):voiceState==="processing"?"paused":"idle"}`}/><span><strong>{voiceState==="connecting"?"Connecting to private voice edge":voiceState==="processing"?"Transcribing final audio":voiceState==="complete"?"Capture complete":voiceState==="error"?"Capture needs attention":running?(paused?"Live capture paused":captureMode==="sample"?"Running labelled sample":"Listening and protecting"):"Ready for live English voice"}</strong><small>{captureMode==="sample"?"SAMPLE DATA":`SESSION-${industry.toUpperCase().replace(/\W/g,"").slice(0,6)}`} · {industry} · {demo.policy}</small></span></div><div className="session-time"><div className={`wave ${running&&!paused?"active":""}`}>{[8,16,23,11,18,7,15,21,10,17,6,13,20,9,16].map((h,i)=><i key={i} style={{height:h,animationDelay:`${i*.05}s`}}/>)}</div><strong>{formatTime(elapsed)}</strong></div></div>
         {voiceError&&<div className="voice-error" role="alert"><Radio size={15}/><span><strong>Live capture unavailable</strong><small>{voiceError}</small></span></div>}
@@ -322,7 +322,7 @@ export function LiveShield({ notify }: { notify: (m: string) => void }) {
           <div className="shield-divider"><i/><span><ShieldCheck size={15}/></span></div>
           <section className="compare-pane safe-pane"><header><span><small>Outbound AI view</small><strong><ShieldCheck size={15}/>What is being masked</strong></span><Pill tone="amber">Provisional · final check</Pill></header><div className="transcript-pane" ref={safePane}>{turns.length?turns.map((turn,i)=><article className="turn" key={`${turn.time}-${i}`}><div><span className={`speaker ${turn.role}`}>{turn.speaker}</span><time>{turn.time}</time></div><p>{highlight(turn.safe,"safe",turn.entities)}</p></article>):<EmptyPane state={voiceState}/>}</div></section>
         </div>
-        <footer className="session-controls"><div><span><Activity size={13}/><strong>{captureMode==="sample"?"Sample":edgeTurns.length?`${edgeTurns.length} live turns`:"Private edge"}</strong></span><span><ShieldCheck size={13}/>{entityCount} masked values</span><span><LockKeyhole size={13}/>No raw AI egress</span></div><div>{!running?<><Button variant="primary" onClick={startStream} disabled={voiceState==="connecting"||voiceState==="processing"}><Mic2 size={15}/>{voiceState==="connecting"?"Connecting…":voiceState==="processing"?"Finalizing…":"Start live capture"}</Button><Button onClick={startSample} disabled={voiceState==="connecting"||voiceState==="processing"}><Play size={15}/>Run sample</Button></>:<><Button onClick={togglePause}>{paused?<Play size={15}/>:<Pause size={15}/>} {paused?"Resume":"Pause"}</Button><Button variant="danger" onClick={stopStream}><CircleStop size={15}/>Stop & protect</Button></>}</div></footer>
+        <footer className="session-controls"><div><span><Activity size={13}/><strong>{captureMode==="sample"?"Sample":edgeTurns.length?`${edgeTurns.length} live turns`:"Private edge"}</strong></span><span><ShieldCheck size={13}/>{entityCount} masked values</span><span><LockKeyhole size={13}/>No raw AI egress</span></div><div>{!running?<><Button variant="primary" onClick={startStream} disabled={voiceState==="connecting"||voiceState==="processing"||edgeAvailable===false} title={edgeAvailable===false?"Start docker compose up to enable live capture":"Connect to self-hosted voice edge"}><Mic2 size={15}/>{voiceState==="connecting"?"Connecting…":voiceState==="processing"?"Finalizing…":edgeAvailable===false?"Start docker to enable":"Start live capture"}</Button><Button onClick={startSample} disabled={voiceState==="connecting"||voiceState==="processing"}><Play size={15}/>Run sample</Button></>:<><Button onClick={togglePause}>{paused?<Play size={15}/>:<Pause size={15}/>} {paused?"Resume":"Pause"}</Button><Button variant="danger" onClick={stopStream}><CircleStop size={15}/>Stop & protect</Button></>}</div></footer>
       </Card>
       <Card><CardHeader title="Try the protection API" subtitle="Type or paste text. The raw input stays on the left and every detected value is replaced in the protected output." action={<Pill tone="blue">Local Next.js API</Pill>}/><div className="try-grid"><label><span>Raw application text</span><textarea value={input} onChange={e=>{setInput(e.target.value);setProtection(null);}} placeholder="Type text containing a name, account, phone, email, health ID, or payment data…"/></label><div><span>Protected application output</span><div className="protected-output" aria-live="polite">{protection?protection.protectedText:"Select Protect text to run the masking policy."}</div></div></div><div className="try-footer"><div>{protection?.entities.length?protection.entities.map(e=><Pill tone="green" key={`${e.type}-${e.start}`}>{e.type} · {e.token}</Pill>):protection?<Pill tone="amber">No identifiers detected</Pill>:null}</div><div className="try-actions"><Button onClick={resetProtection} disabled={busy}><RotateCcw size={15}/>Reset</Button><Button variant="primary" disabled={busy||!input.trim()} onClick={protectSample}><ShieldCheck size={15}/>{busy?"Protecting…":"Protect text"}</Button></div></div></Card>
       {summary && <Card><CardHeader title="Protected AI summary" subtitle="Generated from the right-side transcript only" action={<Pill tone="green"><Sparkles size={12}/>No raw identifiers</Pill>}/><div className="summary-box">{summary}</div></Card>}
