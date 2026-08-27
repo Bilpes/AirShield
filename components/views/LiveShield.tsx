@@ -70,6 +70,12 @@ export function LiveShield({ notify }: { notify: (m: string) => void }) {
     return null;
   }
 
+  function isEdgeConfigured(): boolean {
+    // Check if the edge URL is explicitly configured in environment
+    const configured = process.env.NEXT_PUBLIC_EDGE_WS_URL?.trim();
+    return Boolean(configured);
+  }
+
   function releaseMicrophone() {
     mediaStream.current?.getTracks().forEach(track=>track.stop());
     mediaStream.current=null;
@@ -92,7 +98,11 @@ export function LiveShield({ notify }: { notify: (m: string) => void }) {
     setVoiceError("");
     try {
       await acquireMicrophone();
-      notify("Microphone connected. Select Start live capture to transcribe through the self-hosted edge.");
+      if (isEdgeConfigured()) {
+        notify("Microphone connected. Select Start live capture to transcribe through the self-hosted edge.");
+      } else {
+        notify("Microphone connected. Note: Live capture requires the edge-service to be running. Use 'Run sample' for demonstration, or start the edge-service with proper configuration to enable live voice capture.");
+      }
     } catch (error) {
       const message=error instanceof Error?error.message:"Microphone permission was not granted.";
       setVoiceState("error"); setVoiceError(message); notify(message);
@@ -103,7 +113,12 @@ export function LiveShield({ notify }: { notify: (m: string) => void }) {
     if (running || voiceState === "connecting" || voiceState === "processing") return;
     const edgeUrl=configuredEdgeUrl();
     if (!edgeUrl) {
-      const message="Live transcription needs NEXT_PUBLIC_EDGE_WS_URL pointing to the self-hosted voice edge or trusted gateway. No browser speech service was used, so raw voice was not sent to a third party.";
+      let message = "Live capture is not available: ";
+      if (isEdgeConfigured()) {
+        message += "The voice edge service at the configured URL is not responding. Ensure the edge-service is running.";
+      } else {
+        message += "NEXT_PUBLIC_EDGE_WS_URL is not configured. Start the self-hosted voice edge service (edge-service) and set the environment variable to enable live voice capture. Alternatively, use 'Run sample' for demonstration.";
+      }
       setVoiceState("error"); setVoiceError(message); notify(message); return;
     }
     setVoiceState("connecting"); setVoiceError(""); setCaptureMode("live"); setEdgeTurns([]); setTurnCount(0); setElapsed(0); setSummary("");
@@ -289,6 +304,6 @@ export function LiveShield({ notify }: { notify: (m: string) => void }) {
 }
 
 function EmptyPane({state}:{state:"idle"|"connecting"|"listening"|"paused"|"processing"|"complete"|"error"}){
-  const copy=state==="connecting"?["Connecting securely","Opening the configured self-hosted voice edge."]:state==="listening"?["Listening for speech","Speak naturally; live raw and masked text will appear here."]:state==="processing"?["Finishing transcription","The final audio chunk is being protected."]:state==="error"?["No live transcript","Resolve the capture message above, then retry."]:["Waiting for live voice","Select Start live capture, allow microphone access, and begin speaking."];
+  const copy=state==="connecting"?["Connecting securely","Opening the configured self-hosted voice edge."]:state==="listening"?["Listening for speech","Speak naturally; live raw and masked text will appear here."]:state==="processing"?["Finishing transcription","The final audio chunk is being protected."]:state==="error"?["Live capture unavailable","Start the edge-service or use 'Run sample' for demonstration."]:["Waiting for live voice","Select Start live capture after connecting microphone, or use 'Run sample' for demonstration."];
   return <div className="empty-pane"><Radio size={26}/><strong>{copy[0]}</strong><small>{copy[1]}</small></div>;
 }
