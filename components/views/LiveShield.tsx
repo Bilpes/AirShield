@@ -56,12 +56,7 @@ export function LiveShield({ notify }: { notify: (m: string) => void }) {
       return;
     }
     // Convert WebSocket URL to HTTP for health check
-<<<<<<< HEAD
     const healthUrl = edgeUrl.replace(/^ws:/, "http:").replace(/\/ws\/voice$/, "/health");
-=======
-    // ws://localhost:8001/ws/voice -> http://localhost:8001/v1/health
-    const healthUrl = edgeUrl.replace(/^ws:/, "http:").replace(/\/ws\/voice$/, "/v1/health");
->>>>>>> d72b1a2ba982ea56417e2ddbb62823f957940f63
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 3000);
     fetch(healthUrl, { method: "GET", signal: controller.signal })

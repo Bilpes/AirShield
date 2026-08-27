@@ -276,7 +276,7 @@ export function DoctorBookingBot({ notify }: { notify: (message: string) => void
   async function startVoice() {
     const url = edgeUrl();
     if (!url) {
-      const message = "Configure NEXT_PUBLIC_EDGE_WS_URL to use the self-hosted voice booking demo.";
+      const message = "Configure NEXT_PUBLIC_EDGE_WS_URL to use voice booking demo, or use text input.";
       setVoiceError(message);
       notify(message);
       return;
@@ -388,7 +388,7 @@ export function DoctorBookingBot({ notify }: { notify: (message: string) => void
       };
       ws.onerror = () => {
         if (voiceTimer.current) clearTimeout(voiceTimer.current);
-        setVoiceError("Could not connect to the self-hosted voice edge on port 8001.");
+        setVoiceError("Could not connect to the self-hosted voice edge. Configure NEXT_PUBLIC_EDGE_WS_URL.");
         setVoiceDraft("");
         releaseVoice();
       };
