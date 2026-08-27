@@ -5,8 +5,6 @@ import {
   AlertTriangle,
   Bot,
   CalendarCheck2,
-  CircleStop,
-  Mic,
   Minimize2,
   RotateCcw,
   Send,
@@ -67,33 +65,12 @@ export function DoctorBookingBot({ notify }: { notify: (message: string) => void
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState<1 | 2 | 3>(1);
   const [showSlots, setShowSlots] = useState(false);
-  const [recording, setRecording] = useState(false);
-  const [voiceDraft, setVoiceDraft] = useState("");
-  const [voiceError, setVoiceError] = useState("");
   const session = useRef<string | null>(null);
   const list = useRef<HTMLDivElement>(null);
-  const stream = useRef<MediaStream | null>(null);
-  const recorder = useRef<MediaRecorder | null>(null);
-  const socket = useRef<WebSocket | null>(null);
-  const audioQueue = useRef<Promise<void>>(Promise.resolve());
-  const voiceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const voiceRaw = useRef<string[]>([]);
-  const voiceProtected = useRef<string[]>([]);
-  const voiceEntities = useRef(0);
 
   useEffect(() => {
     list.current?.scrollTo({ top: list.current.scrollHeight, behavior: "smooth" });
-  }, [messages, showSlots, voiceDraft, voiceError]);
-
-  useEffect(
-    () => () => {
-      if (voiceTimer.current) clearTimeout(voiceTimer.current);
-      if (recorder.current?.state !== "inactive") recorder.current?.stop();
-      stream.current?.getTracks().forEach((track) => track.stop());
-      socket.current?.close();
-    },
-    [],
-  );
+  }, [messages, showSlots]);
 
   async function ensureSession(): Promise<string> {
     if (session.current) return session.current;
@@ -170,7 +147,6 @@ export function DoctorBookingBot({ notify }: { notify: (message: string) => void
 
   async function protectAndSend(raw: string) {
     setBusy(true);
-    setVoiceError("");
     try {
       if (looksUrgent(raw)) {
         setMessages((current) => [
@@ -214,7 +190,6 @@ export function DoctorBookingBot({ notify }: { notify: (message: string) => void
       notify("Only the protected request entered the doctor-booking demonstration flow.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "The protected doctor bot is unavailable.";
-      setVoiceError(message);
       notify(message);
     } finally {
       setBusy(false);
@@ -224,176 +199,9 @@ export function DoctorBookingBot({ notify }: { notify: (message: string) => void
   async function submit(event?: FormEvent) {
     event?.preventDefault();
     const value = input.trim();
-    if (!value || busy || recording) return;
+    if (!value || busy) return;
     setInput("");
     await protectAndSend(value);
-  }
-
-  function edgeUrl(): string | null {
-    const configured = process.env.NEXT_PUBLIC_EDGE_WS_URL?.trim();
-    if (configured) return configured;
-    if (
-      typeof window !== "undefined" &&
-      window.location.protocol === "http:" &&
-      ["localhost", "127.0.0.1"].includes(window.location.hostname)
-    ) {
-      return `ws://${window.location.hostname}:8001/ws/voice`;
-    }
-    return null;
-  }
-
-  function releaseVoice() {
-    stream.current?.getTracks().forEach((track) => track.stop());
-    stream.current = null;
-    recorder.current = null;
-    setRecording(false);
-  }
-
-  async function startVoice() {
-    const url = edgeUrl();
-    if (!url) {
-      const message = "Configure NEXT_PUBLIC_EDGE_WS_URL to use the self-hosted voice booking demo.";
-      setVoiceError(message);
-      notify(message);
-      return;
-    }
-    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-      const message = "Microphone recording is unavailable in this browser. Use HTTPS or localhost.";
-      setVoiceError(message);
-      notify(message);
-      return;
-    }
-    setVoiceError("");
-    setVoiceDraft("Connecting to the private voice edge…");
-    voiceRaw.current = [];
-    voiceProtected.current = [];
-    voiceEntities.current = 0;
-    try {
-      const media = await navigator.mediaDevices.getUserMedia({
-        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
-      });
-      stream.current = media;
-      const ws = new WebSocket(url);
-      socket.current = ws;
-      ws.onopen = () => {
-        try {
-          const formats = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
-          const mimeType = formats.find((format) => MediaRecorder.isTypeSupported(format));
-          const mediaRecorder = new MediaRecorder(media, mimeType ? { mimeType } : undefined);
-          recorder.current = mediaRecorder;
-          audioQueue.current = Promise.resolve();
-          mediaRecorder.ondataavailable = (chunk) => {
-            if (!chunk.data.size) return;
-            audioQueue.current = audioQueue.current.then(async () => {
-              const bytes = await chunk.data.arrayBuffer();
-              if (ws.readyState === WebSocket.OPEN) ws.send(bytes);
-            });
-          };
-          mediaRecorder.onstop = () => {
-            void audioQueue.current.then(() => {
-              if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "session.end" }));
-            });
-          };
-          ws.send(
-            JSON.stringify({
-              type: "session.start",
-              language: "en",
-              policy: "Healthcare · HIPAA",
-              audio_format: mediaRecorder.mimeType || mimeType || "audio/webm",
-            }),
-          );
-          mediaRecorder.start(750);
-          setRecording(true);
-          setVoiceDraft("Listening privately… Select the stop button when your command is complete.");
-        } catch {
-          releaseVoice();
-          ws.close();
-          setVoiceError("The browser recorder could not start.");
-        }
-      };
-      ws.onmessage = (event) => {
-        try {
-          const message = JSON.parse(String(event.data));
-          if (message.type === "transcript.pair" && typeof message.raw === "string") {
-            voiceRaw.current.push(message.raw);
-            if (typeof message.protected === "string") voiceProtected.current.push(message.protected);
-            if (Array.isArray(message.entities)) voiceEntities.current += message.entities.length;
-            setVoiceDraft(`Heard locally: ${voiceRaw.current.join(" ")} · protected preview is provisional`);
-          } else if (message.type === "policy.decision" && message.decision !== "allow") {
-            if (voiceTimer.current) clearTimeout(voiceTimer.current);
-            const reason = typeof message.reason === "string" ? message.reason : "voice policy denied the request";
-            setVoiceError(`Voice command blocked: ${reason}. No RIA request was released.`);
-            releaseVoice();
-            ws.close();
-          } else if (message.type === "transcript.final") {
-            if (voiceTimer.current) clearTimeout(voiceTimer.current);
-            const raw = voiceRaw.current.join(" ").trim();
-            const protectedText =
-              typeof message.protected === "string" && message.protected
-                ? message.protected
-                : voiceProtected.current.join(" ").trim();
-            const decision = typeof message.decision === "string" ? message.decision : "review";
-            const receipt = message.receipt && typeof message.receipt === "object" ? message.receipt : null;
-            const signature = typeof receipt?.signature === "string" ? receipt.signature : "";
-            const signedAllow =
-              decision === "allow" &&
-              message.safe_for_egress === true &&
-              signature.length >= 40 &&
-              signature !== "demo_unsigned";
-            const count = Array.isArray(message.entities) ? message.entities.length : voiceEntities.current;
-            const receiptId = typeof receipt?.receipt_id === "string" ? receipt.receipt_id : "no signed voice receipt";
-            if (raw && protectedText && signedAllow) {
-              addProtectedConversation(raw, protectedText, count, receiptId, decision);
-              notify("Voice completed with a signed allow receipt; only protected text entered the booking demo.");
-            } else if (raw) {
-              addHeldConversation(raw, protectedText, count, receiptId, decision);
-              notify("Voice remained inside the trust boundary because no signed final allow receipt was available.");
-            } else {
-              setVoiceError("No protected English speech was available; nothing was sent to the bot.");
-            }
-            setVoiceDraft("");
-            releaseVoice();
-            ws.close();
-          }
-        } catch {
-          if (voiceTimer.current) clearTimeout(voiceTimer.current);
-          setVoiceError("The voice edge returned an invalid response; no bot request was released.");
-          releaseVoice();
-          ws.close();
-        }
-      };
-      ws.onerror = () => {
-        if (voiceTimer.current) clearTimeout(voiceTimer.current);
-        setVoiceError("Could not connect to the self-hosted voice edge on port 8001.");
-        setVoiceDraft("");
-        releaseVoice();
-      };
-      ws.onclose = () => {
-        socket.current = null;
-      };
-    } catch {
-      releaseVoice();
-      setVoiceDraft("");
-      const message = "Microphone permission was denied or the device is unavailable.";
-      setVoiceError(message);
-      notify(message);
-    }
-  }
-
-  function stopVoice() {
-    if (recorder.current?.state === "recording" || recorder.current?.state === "paused") {
-      recorder.current.stop();
-      setVoiceDraft("Final audio is being transcribed and protected…");
-      setRecording(false);
-      stream.current?.getTracks().forEach((track) => track.stop());
-      if (voiceTimer.current) clearTimeout(voiceTimer.current);
-      voiceTimer.current = setTimeout(() => {
-        setVoiceDraft("");
-        setVoiceError("Timed out waiting for the final privacy check; no RIA request was released.");
-        socket.current?.close();
-        releaseVoice();
-      }, 120_000);
-    }
   }
 
   function reserveSlot() {
@@ -424,16 +232,10 @@ export function DoctorBookingBot({ notify }: { notify: (message: string) => void
 
   function reset() {
     session.current = null;
-    if (voiceTimer.current) clearTimeout(voiceTimer.current);
-    voiceTimer.current = null;
-    socket.current?.close();
-    releaseVoice();
     setMessages(INITIAL_MESSAGES);
     setInput("");
     setStage(1);
     setShowSlots(false);
-    setVoiceDraft("");
-    setVoiceError("");
   }
 
   if (!open) {
@@ -466,7 +268,7 @@ export function DoctorBookingBot({ notify }: { notify: (message: string) => void
       </div>
 
       <div className="doctor-bot-chat" ref={list} aria-live="polite">
-        {messages.length === 1 && <div className="doctor-bot-command-intro"><span>Try a text or voice command</span><div>{QUICK_COMMANDS.map((command, index)=><button key={command} onClick={()=>setInput(command)}>{index===0?"Describe symptoms":index===1?"Book video visit":"Find a specialist"}</button>)}</div></div>}
+        {messages.length === 1 && <div className="doctor-bot-command-intro"><span>Try a text command</span><div>{QUICK_COMMANDS.map((command, index)=><button key={command} onClick={()=>setInput(command)}>{index===0?"Describe symptoms":index===1?"Book video visit":"Find a specialist"}</button>)}</div></div>}
         {messages.map((message) => {
           if (message.kind === "protected") {
             return <article className={`doctor-bot-protection ${message.routed ? "routed" : "held"}`} key={message.id}><header><ShieldCheck size={13}/><strong>{message.routed ? "Sent to RIA demo — protected text" : "Held by AirShield — not routed"}</strong></header><p>{message.text}</p><footer><span>{message.count} identifiers tokenized</span><span>{message.decision}</span><span>Receipt {message.receipt.slice(0,18)}</span></footer></article>;
@@ -481,14 +283,11 @@ export function DoctorBookingBot({ notify }: { notify: (message: string) => void
           <div className="doctor-bot-safety"><AlertTriangle size={14}/><button onClick={urgentGuidance}>I may have emergency signs</button><button onClick={()=>setShowSlots(true)}>No emergency signs</button></div>
           <article className="doctor-bot-slot"><span><Stethoscope size={18}/></span><div><strong>Virtual General Physician</strong><small><Video size={12}/>Tomorrow · 10:00 AM · 20 min</small></div><button onClick={reserveSlot}>Reserve slot</button></article>
         </>}
-        {voiceDraft && <div className="doctor-bot-voice-state"><span className="voice-bars">{[5,11,17,8,14,19,7,13].map((height,index)=><i key={index} style={{height}}/>)}</span><span>{voiceDraft}</span></div>}
-        {voiceError && <div className="doctor-bot-error" role="alert"><AlertTriangle size={13}/><span>{voiceError}</span></div>}
       </div>
 
       <form className="doctor-bot-compose" onSubmit={submit}>
         <label><span className="sr-only">Doctor booking command</span><input value={input} onChange={(event)=>setInput(event.target.value)} placeholder="Type symptoms or booking request…" maxLength={4000}/></label>
-        <button type="button" className={recording?"recording":""} onClick={recording?stopVoice:startVoice} aria-label={recording?"Stop voice command":"Start protected voice command"}>{recording?<CircleStop size={18}/>:<Mic size={18}/>}</button>
-        <button type="submit" disabled={busy||recording||!input.trim()} aria-label="Protect and send booking command"><Send size={18}/></button>
+        <button type="submit" disabled={busy||!input.trim()} aria-label="Protect and send booking command"><Send size={18}/></button>
         <small><ShieldCheck size={11}/>Only protected text enters the RIA and trusted booking demonstration path.</small>
       </form>
     </aside>
