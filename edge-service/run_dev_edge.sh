@@ -61,7 +61,7 @@ fi
 # 4) Boot the edge in development mode
 echo "==> Starting voice edge on http://localhost:8001"
 echo "    Health:  curl http://localhost:8001/v1/health"
-echo "    WS:      ws://localhost:8001/ws/voice  (used by the web app)"
-echo "    Web app should run with NEXT_PUBLIC_EDGE_WS_URL=ws://localhost:8001/ws/voice"
-echo "    (already the committed .env.local default). Press Ctrl-C to stop."
+echo "    WS:      ws://localhost:8001/ws/voice (the web app proxies this"
+echo "             same-origin at /edge/ws/voice — no browser URL config needed)."
+echo "    (Committed .env.local default: empty NEXT_PUBLIC_EDGE_WS_URL.) Press Ctrl-C to stop."
 exec uvicorn app.main:app --host 0.0.0.0 --port 8001 --no-proxy-headers

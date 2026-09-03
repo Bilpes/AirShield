@@ -7,8 +7,12 @@ FROM node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb836
 WORKDIR /app
 ARG NEXT_PUBLIC_EDGE_WS_URL=
 ARG AIRSHIELD_ALLOW_INSECURE_LOCAL_EDGE=false
+# Same-origin /edge/* proxy upstream; rewrites are resolved at build time, so
+# full-stack builds must point this at the edge service container.
+ARG EDGE_UPSTREAM=http://127.0.0.1:8001
 ENV NEXT_PUBLIC_EDGE_WS_URL=$NEXT_PUBLIC_EDGE_WS_URL \
-    AIRSHIELD_ALLOW_INSECURE_LOCAL_EDGE=$AIRSHIELD_ALLOW_INSECURE_LOCAL_EDGE
+    AIRSHIELD_ALLOW_INSECURE_LOCAL_EDGE=$AIRSHIELD_ALLOW_INSECURE_LOCAL_EDGE \
+    EDGE_UPSTREAM=$EDGE_UPSTREAM
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build

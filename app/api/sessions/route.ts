@@ -36,7 +36,7 @@ export async function POST(request: Request) {
         session_id: `ses_${randomBytes(5).toString("hex")}`,
         language: "en",
         policy,
-        stream_url: process.env.NEXT_PUBLIC_EDGE_WS_URL || "self-hosted edge not configured",
+        stream_url: process.env.NEXT_PUBLIC_EDGE_WS_URL || "/edge/ws/voice (same-origin proxy)",
         expires_at: new Date(Date.now() + 3_600_000).toISOString(),
       },
       { status: 201 },
