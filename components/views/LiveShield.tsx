@@ -47,32 +47,43 @@ export function LiveShield({ notify }: { notify: (m: string) => void }) {
     socket.current?.close();
   },[]);
 
-  // Check if edge service is available on mount
+  // Poll the local voice edge health endpoint. The edge runs directly on the
+  // laptop via ./run_local.sh (no Docker needed); polling means the UI enables
+  // live capture automatically as soon as the edge finishes starting (first run
+  // installs Python deps and downloads the Whisper model).
   useEffect(()=>{
-    if (edgeAvailable !== null) return; // Already checked
     const edgeUrl = configuredEdgeUrl();
     if (!edgeUrl) {
       setEdgeAvailable(false);
       return;
     }
-    // Convert WebSocket URL to HTTP for health check
-    const healthUrl = edgeUrl.replace(/^ws:/, "http:").replace(/\/ws\/voice$/, "/health");
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000);
-    fetch(healthUrl, { method: "GET", signal: controller.signal })
-      .then(res => {
+    // Convert WebSocket URL to HTTP for the health check:
+    // ws://localhost:8001/ws/voice -> http://localhost:8001/v1/health
+    const healthUrl = edgeUrl.replace(/^ws:/, "http:").replace(/\/ws\/voice$/, "/v1/health");
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    async function check() {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4000);
+      try {
+        const res = await fetch(healthUrl, { method: "GET", signal: controller.signal, cache: "no-store" });
         clearTimeout(timeout);
-        setEdgeAvailable(res.ok);
-        if (!res.ok) {
-          setVoiceError(`Voice edge service returned status ${res.status}. Run: docker compose up`);
+        if (cancelled) return;
+        if (res.ok) {
+          setEdgeAvailable(true);
+          setVoiceError(prev => prev.includes("Voice edge") ? "" : prev);
+          return;
         }
-      })
-      .catch(() => {
-        clearTimeout(timeout);
         setEdgeAvailable(false);
-        setVoiceError(`Voice edge service is not running. Run: docker compose up (starts edge on port 8001)`);
-      });
-  }, [edgeAvailable]);
+      } catch {
+        if (!cancelled) setEdgeAvailable(false);
+      }
+      // Retry every 5s while the edge is (still) down — it may be starting.
+      if (!cancelled) timer = setTimeout(check, 5000);
+    }
+    void check();
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, []);
 
   async function ensureControlSession(): Promise<string> {
     if (controlSession.current?.policy === demo.policy) return controlSession.current.id;
@@ -98,12 +109,6 @@ export function LiveShield({ notify }: { notify: (m: string) => void }) {
     return null;
   }
 
-  function isEdgeConfigured(): boolean {
-    // Check if the edge URL is explicitly configured in environment
-    const configured = process.env.NEXT_PUBLIC_EDGE_WS_URL?.trim();
-    return Boolean(configured);
-  }
-
   function releaseMicrophone() {
     mediaStream.current?.getTracks().forEach(track=>track.stop());
     mediaStream.current=null;
@@ -126,10 +131,10 @@ export function LiveShield({ notify }: { notify: (m: string) => void }) {
     setVoiceError("");
     try {
       await acquireMicrophone();
-      if (isEdgeConfigured()) {
-        notify("Microphone connected. Select Start live capture to transcribe through the self-hosted edge.");
+      if (edgeAvailable) {
+        notify("Microphone connected. Select Start live capture to transcribe through the local voice edge.");
       } else {
-        notify("Microphone connected. Note: Live capture requires the edge-service to be running. Use 'Run sample' for demonstration, or start the edge-service with proper configuration to enable live voice capture.");
+        notify("Microphone connected. Live capture needs the voice edge: run ./run_local.sh from the project root (or docker compose up). Use 'Run sample' meanwhile.");
       }
     } catch (error) {
       const message=error instanceof Error?error.message:"Microphone permission was not granted.";
@@ -141,18 +146,21 @@ export function LiveShield({ notify }: { notify: (m: string) => void }) {
     if (running || voiceState === "connecting" || voiceState === "processing") return;
     const edgeUrl=configuredEdgeUrl();
     if (!edgeUrl) {
-      setVoiceState("error"); 
-      setVoiceError("NEXT_PUBLIC_EDGE_WS_URL is not configured. Use 'Run sample' for demonstration, or run: docker compose up");
-      notify("Live capture requires Docker. Use 'Run sample' for demonstration.");
+      setVoiceState("error");
+      setVoiceError("Live capture needs the local voice edge. Run ./run_local.sh from the project root (or docker compose up for the full stack), then reload.");
+      notify("Live capture needs the local voice edge. Run ./run_local.sh, or use 'Run sample' for demonstration.");
       return;
     }
     // Check if edge is available (may have been checked on mount, or we check now)
     if (edgeAvailable === false) {
       setVoiceState("error");
-      setVoiceError("Voice edge service is not running. Run: docker compose up (starts all services including edge on port 8001)");
-      notify("Cannot start live capture: edge-service is not running. Use 'Run sample' for demonstration.");
+      setVoiceError("Voice edge service is not running on port 8001. Start it with ./run_local.sh (no Docker needed) or docker compose up, then wait — the button enables itself once the edge is healthy.");
+      notify("Cannot start live capture: voice edge is not running. Start it with ./run_local.sh, or use 'Run sample'.");
       return;
     }
+    // edgeAvailable === null means the first health probe is still in flight;
+    // attempt the connection directly — the WebSocket error handler reports
+    // clearly if the edge really is not up yet.
     setVoiceState("connecting"); setVoiceError(""); setCaptureMode("live"); setEdgeTurns([]); setTurnCount(0); setElapsed(0); setSummary("");
     expectedSocketClose.current=false;
     try {
@@ -313,7 +321,7 @@ export function LiveShield({ notify }: { notify: (m: string) => void }) {
 
   return <div className="view">
     <PageIntro title="Voice privacy, live and side by side" description="English voice is captured live, transcribed, diarized, and protected on your own infrastructure before any AI model receives it." actions={<><Button onClick={connectMicrophone} disabled={micConnected||running}><Mic2 size={15}/>{micConnected?"Microphone connected":"Connect microphone"}</Button><Button onClick={reset}><RotateCcw size={15}/>Reset</Button></>}/>
-    <div className="industry-bar"><div><span>Industry policy</span><div>{INDUSTRIES.map(item=><button key={item} onClick={()=>chooseIndustry(item)} className={industry===item?"active":""}>{item}</button>)}</div></div><div className="source-state"><span className={`status-dot ${voiceState==="error"?"error":voiceState==="listening"?"active":edgeAvailable===false?"error":""}`}/><span><strong>{captureMode==="sample"?"Clearly labelled sample":voiceState==="listening"?"Live microphone capture":micConnected?"Microphone ready":edgeAvailable===false?"Docker required for live":"Voice edge ready"}</strong><small>{edgeAvailable===false?"Run: docker compose up":"English · self-hosted transcription only"}</small></span></div></div>
+    <div className="industry-bar"><div><span>Industry policy</span><div>{INDUSTRIES.map(item=><button key={item} onClick={()=>chooseIndustry(item)} className={industry===item?"active":""}>{item}</button>)}</div></div><div className="source-state"><span className={`status-dot ${voiceState==="error"?"error":voiceState==="listening"?"active":edgeAvailable===false?"error":""}`}/><span><strong>{captureMode==="sample"?"Clearly labelled sample":voiceState==="listening"?"Live microphone capture":micConnected?"Microphone ready":edgeAvailable===false?"Voice edge offline — run ./run_local.sh":"Voice edge ready"}</strong><small>{edgeAvailable===false?"Local: ./run_local.sh · Docker: docker compose up":"English · self-hosted transcription only"}</small></span></div></div>
     <div className="live-grid"><div className="live-main">
       <Card className="encounter-card"><div className="session-bar"><div className="session-state"><span className={`record-dot ${running?(paused?"paused":"recording"):voiceState==="processing"?"paused":"idle"}`}/><span><strong>{voiceState==="connecting"?"Connecting to private voice edge":voiceState==="processing"?"Transcribing final audio":voiceState==="complete"?"Capture complete":voiceState==="error"?"Capture needs attention":running?(paused?"Live capture paused":captureMode==="sample"?"Running labelled sample":"Listening and protecting"):"Ready for live English voice"}</strong><small>{captureMode==="sample"?"SAMPLE DATA":`SESSION-${industry.toUpperCase().replace(/\W/g,"").slice(0,6)}`} · {industry} · {demo.policy}</small></span></div><div className="session-time"><div className={`wave ${running&&!paused?"active":""}`}>{[8,16,23,11,18,7,15,21,10,17,6,13,20,9,16].map((h,i)=><i key={i} style={{height:h,animationDelay:`${i*.05}s`}}/>)}</div><strong>{formatTime(elapsed)}</strong></div></div>
         {voiceError&&<div className="voice-error" role="alert"><Radio size={15}/><span><strong>Live capture unavailable</strong><small>{voiceError}</small></span></div>}
@@ -322,7 +330,7 @@ export function LiveShield({ notify }: { notify: (m: string) => void }) {
           <div className="shield-divider"><i/><span><ShieldCheck size={15}/></span></div>
           <section className="compare-pane safe-pane"><header><span><small>Outbound AI view</small><strong><ShieldCheck size={15}/>What is being masked</strong></span><Pill tone="amber">Provisional · final check</Pill></header><div className="transcript-pane" ref={safePane}>{turns.length?turns.map((turn,i)=><article className="turn" key={`${turn.time}-${i}`}><div><span className={`speaker ${turn.role}`}>{turn.speaker}</span><time>{turn.time}</time></div><p>{highlight(turn.safe,"safe",turn.entities)}</p></article>):<EmptyPane state={voiceState}/>}</div></section>
         </div>
-        <footer className="session-controls"><div><span><Activity size={13}/><strong>{captureMode==="sample"?"Sample":edgeTurns.length?`${edgeTurns.length} live turns`:"Private edge"}</strong></span><span><ShieldCheck size={13}/>{entityCount} masked values</span><span><LockKeyhole size={13}/>No raw AI egress</span></div><div>{!running?<><Button variant="primary" onClick={startStream} disabled={voiceState==="connecting"||voiceState==="processing"||edgeAvailable===false} title={edgeAvailable===false?"Start docker compose up to enable live capture":"Connect to self-hosted voice edge"}><Mic2 size={15}/>{voiceState==="connecting"?"Connecting…":voiceState==="processing"?"Finalizing…":edgeAvailable===false?"Start docker to enable":"Start live capture"}</Button><Button onClick={startSample} disabled={voiceState==="connecting"||voiceState==="processing"}><Play size={15}/>Run sample</Button></>:<><Button onClick={togglePause}>{paused?<Play size={15}/>:<Pause size={15}/>} {paused?"Resume":"Pause"}</Button><Button variant="danger" onClick={stopStream}><CircleStop size={15}/>Stop & protect</Button></>}</div></footer>
+        <footer className="session-controls"><div><span><Activity size={13}/><strong>{captureMode==="sample"?"Sample":edgeTurns.length?`${edgeTurns.length} live turns`:"Private edge"}</strong></span><span><ShieldCheck size={13}/>{entityCount} masked values</span><span><LockKeyhole size={13}/>No raw AI egress</span></div><div>{!running?<><Button variant="primary" onClick={startStream} disabled={voiceState==="connecting"||voiceState==="processing"||edgeAvailable===false} title={edgeAvailable===false?"Start the local voice edge with ./run_local.sh (or docker compose up) to enable live capture":"Connect to the local self-hosted voice edge"}><Mic2 size={15}/>{voiceState==="connecting"?"Connecting…":voiceState==="processing"?"Finalizing…":edgeAvailable===false?"Start voice edge to enable":"Start live capture"}</Button><Button onClick={startSample} disabled={voiceState==="connecting"||voiceState==="processing"}><Play size={15}/>Run sample</Button></>:<><Button onClick={togglePause}>{paused?<Play size={15}/>:<Pause size={15}/>} {paused?"Resume":"Pause"}</Button><Button variant="danger" onClick={stopStream}><CircleStop size={15}/>Stop & protect</Button></>}</div></footer>
       </Card>
       <Card><CardHeader title="Try the protection API" subtitle="Type or paste text. The raw input stays on the left and every detected value is replaced in the protected output." action={<Pill tone="blue">Local Next.js API</Pill>}/><div className="try-grid"><label><span>Raw application text</span><textarea value={input} onChange={e=>{setInput(e.target.value);setProtection(null);}} placeholder="Type text containing a name, account, phone, email, health ID, or payment data…"/></label><div><span>Protected application output</span><div className="protected-output" aria-live="polite">{protection?protection.protectedText:"Select Protect text to run the masking policy."}</div></div></div><div className="try-footer"><div>{protection?.entities.length?protection.entities.map(e=><Pill tone="green" key={`${e.type}-${e.start}`}>{e.type} · {e.token}</Pill>):protection?<Pill tone="amber">No identifiers detected</Pill>:null}</div><div className="try-actions"><Button onClick={resetProtection} disabled={busy}><RotateCcw size={15}/>Reset</Button><Button variant="primary" disabled={busy||!input.trim()} onClick={protectSample}><ShieldCheck size={15}/>{busy?"Protecting…":"Protect text"}</Button></div></div></Card>
       {summary && <Card><CardHeader title="Protected AI summary" subtitle="Generated from the right-side transcript only" action={<Pill tone="green"><Sparkles size={12}/>No raw identifiers</Pill>}/><div className="summary-box">{summary}</div></Card>}
