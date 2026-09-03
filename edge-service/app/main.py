@@ -156,9 +156,13 @@ def development_signed_receipt(
     signing_input = "|".join(
         ["airshield-development-receipt-v1", receipt_id, decision, policy, content_sha256, created_at]
     )
-    signature = base64.urlsafe_b64encode(
-        hmac.new(DEVELOPMENT_RECEIPT_KEY, signing_input.encode(), hashlib.sha256).digest()
-    ).decode().rstrip("=")
+    signature = (
+        base64.urlsafe_b64encode(
+            hmac.new(DEVELOPMENT_RECEIPT_KEY, signing_input.encode(), hashlib.sha256).digest()
+        )
+        .decode()
+        .rstrip("=")
+    )
     return {
         "receipt_id": receipt_id,
         "content_sha256": content_sha256,
