@@ -64,23 +64,26 @@ export function LiveShield({ notify }: { notify: (m: string) => void }) {
     const healthUrl = edgeHealthUrl(edgeUrl);
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    let failures = 0;
     async function check() {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 4000);
+      const timeout = setTimeout(() => controller.abort(), 8000);
       try {
         const res = await fetch(healthUrl, { method: "GET", signal: controller.signal, cache: "no-store" });
         clearTimeout(timeout);
         if (cancelled) return;
         if (res.ok) {
+          failures = 0;
           setEdgeAvailable(true);
           setVoiceError(prev => prev.includes("Voice edge") ? "" : prev);
           return;
         }
-        setEdgeAvailable(false);
+        failures += 1;
       } catch {
-        if (!cancelled) setEdgeAvailable(false);
+        clearTimeout(timeout);
+        if (!cancelled) failures += 1;
       }
-      // Retry every 5s while the edge is (still) down — it may be starting.
+      if (!cancelled && failures >= 2) setEdgeAvailable(false);
       if (!cancelled) timer = setTimeout(check, 5000);
     }
     void check();

@@ -112,21 +112,25 @@ export function DoctorBookingBot({ notify }: { notify: (message: string) => void
     const healthUrl = edgeHealthUrl(url);
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    let failures = 0;
     async function check() {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 4000);
+      const timeout = setTimeout(() => controller.abort(), 8000);
       try {
         const res = await fetch(healthUrl, { method: "GET", signal: controller.signal, cache: "no-store" });
         clearTimeout(timeout);
         if (cancelled) return;
         if (res.ok) {
+          failures = 0;
           setVoiceAvailable(true);
           return;
         }
-        setVoiceAvailable(false);
+        failures += 1;
       } catch {
-        if (!cancelled) setVoiceAvailable(false);
+        clearTimeout(timeout);
+        if (!cancelled) failures += 1;
       }
+      if (!cancelled && failures >= 2) setVoiceAvailable(false);
       if (!cancelled) timer = setTimeout(check, 5000);
     }
     void check();
