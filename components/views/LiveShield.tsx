@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Activity, Bot, CircleStop, CircleUserRound, Cpu, LockKeyhole, Mic2, Pause, Play, Radio, RotateCcw, Send, ShieldCheck, Sparkles, UsersRound } from "lucide-react";
 import { DEMOS, INDUSTRIES } from "@/lib/demo-data";
+import { edgeHealthUrl, edgeWebSocketUrl } from "@/lib/edge";
 import type { Industry, ProtectionResult, TranscriptTurn } from "@/lib/types";
 import { Button, Card, CardHeader, PageIntro, Pill, highlight } from "../ui";
 
@@ -47,19 +48,20 @@ export function LiveShield({ notify }: { notify: (m: string) => void }) {
     socket.current?.close();
   },[]);
 
-  // Poll the local voice edge health endpoint. The edge runs directly on the
-  // laptop via ./run_local.sh (no Docker needed); polling means the UI enables
-  // live capture automatically as soon as the edge finishes starting (first run
-  // installs Python deps and downloads the Whisper model).
+  // Poll the voice edge health endpoint through the same-origin /edge proxy.
+  // The edge runs directly on the machine via ./run_local.sh (no Docker
+  // needed); polling means the UI enables live capture automatically as soon
+  // as the edge finishes starting (first run installs Python deps and
+  // downloads the Whisper model).
   useEffect(()=>{
-    const edgeUrl = configuredEdgeUrl();
+    const edgeUrl = edgeWebSocketUrl();
     if (!edgeUrl) {
       setEdgeAvailable(false);
       return;
     }
-    // Convert WebSocket URL to HTTP for the health check:
-    // ws://localhost:8001/ws/voice -> http://localhost:8001/v1/health
-    const healthUrl = edgeUrl.replace(/^ws:/, "http:").replace(/\/ws\/voice$/, "/v1/health");
+    // Health endpoint of the edge the browser will dial — by default the
+    // same-origin proxy (/edge/ws/voice -> /edge/v1/health).
+    const healthUrl = edgeHealthUrl(edgeUrl);
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
     async function check() {
@@ -100,15 +102,6 @@ export function LiveShield({ notify }: { notify: (m: string) => void }) {
     return data.session_id;
   }
 
-  function configuredEdgeUrl(): string | null {
-    const configured = process.env.NEXT_PUBLIC_EDGE_WS_URL?.trim();
-    if (configured) return configured;
-    if (typeof window !== "undefined" && window.location.protocol === "http:" && ["localhost", "127.0.0.1"].includes(window.location.hostname)) {
-      return `ws://${window.location.hostname}:8001/ws/voice`;
-    }
-    return null;
-  }
-
   function releaseMicrophone() {
     mediaStream.current?.getTracks().forEach(track=>track.stop());
     mediaStream.current=null;
@@ -144,7 +137,7 @@ export function LiveShield({ notify }: { notify: (m: string) => void }) {
 
   async function startStream() {
     if (running || voiceState === "connecting" || voiceState === "processing") return;
-    const edgeUrl=configuredEdgeUrl();
+    const edgeUrl=edgeWebSocketUrl();
     if (!edgeUrl) {
       setVoiceState("error");
       setVoiceError("Live capture needs the local voice edge. Run ./run_local.sh from the project root (or docker compose up for the full stack), then reload.");

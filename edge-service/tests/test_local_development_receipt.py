@@ -22,7 +22,13 @@ def _standalone_dev_client(monkeypatch):
         "transcribe",
         lambda _path: (
             "Patient is Jack with email jack@example.com call 5551234567",
-            [{"start": 0.0, "end": 2.0, "text": "Patient is Jack with email jack@example.com call 5551234567"}],
+            [
+                {
+                    "start": 0.0,
+                    "end": 2.0,
+                    "text": "Patient is Jack with email jack@example.com call 5551234567",
+                }
+            ],
         ),
     )
     monkeypatch.setattr(main, "diarize", lambda _path: [])
@@ -33,8 +39,12 @@ def test_interim_local_turns_remain_provisional_and_unsigned(monkeypatch):
     client = _standalone_dev_client(monkeypatch)
     with client.websocket_connect("/ws/voice") as ws:
         ws.send_json(
-            {"type": "session.start", "language": "en", "policy": "Healthcare · HIPAA",
-             "audio_format": "audio/webm"}
+            {
+                "type": "session.start",
+                "language": "en",
+                "policy": "Healthcare · HIPAA",
+                "audio_format": "audio/webm",
+            }
         )
         assert ws.receive_json()["type"] == "session.ready"
         # Enough bytes to cross min_process_bytes; session.end forces the flush,
@@ -56,8 +66,12 @@ def test_local_final_receipt_is_signed_and_allow(monkeypatch):
     client = _standalone_dev_client(monkeypatch)
     with client.websocket_connect("/ws/voice") as ws:
         ws.send_json(
-            {"type": "session.start", "language": "en", "policy": "Healthcare · HIPAA",
-             "audio_format": "audio/webm"}
+            {
+                "type": "session.start",
+                "language": "en",
+                "policy": "Healthcare · HIPAA",
+                "audio_format": "audio/webm",
+            }
         )
         ws.receive_json()  # session.ready
         ws.send_bytes(b"x" * main.settings.min_process_bytes)
@@ -82,9 +96,7 @@ def test_local_final_receipt_is_signed_and_allow(monkeypatch):
 
 def test_local_protect_http_route_signs_final(monkeypatch):
     _standalone_dev_client(monkeypatch)
-    result = main.local_protect(
-        "email jack@example.com", {}, final_egress=True, policy="healthcare-us-eu-v1"
-    )
+    result = main.local_protect("email jack@example.com", {}, final_egress=True, policy="healthcare-us-eu-v1")
     assert result["decision"] == "allow"
     assert result["receipt"]["signature"] != "demo_unsigned"
     assert len(result["receipt"]["signature"]) >= 40
@@ -105,26 +117,33 @@ def test_development_receipt_signature_binds_content():
     def expected_signature(receipt_id, protected, policy, decision, created_at):
         content_sha256 = hashlib.sha256(protected.encode()).hexdigest()
         signing_input = "|".join(
-            ["airshield-development-receipt-v1", receipt_id, decision, policy,
-             content_sha256, created_at]
+            ["airshield-development-receipt-v1", receipt_id, decision, policy, content_sha256, created_at]
         )
-        return base64.urlsafe_b64encode(
-            hmac.new(main.DEVELOPMENT_RECEIPT_KEY, signing_input.encode(), hashlib.sha256).digest()
-        ).decode().rstrip("=")
+        return (
+            base64.urlsafe_b64encode(
+                hmac.new(main.DEVELOPMENT_RECEIPT_KEY, signing_input.encode(), hashlib.sha256).digest()
+            )
+            .decode()
+            .rstrip("=")
+        )
 
     receipt = main.development_signed_receipt(
-        protected="Patient [PERSON_1]", entities=[{"type": "PERSON"}],
-        policy="healthcare-us-eu-v1", decision="allow",
+        protected="Patient [PERSON_1]",
+        entities=[{"type": "PERSON"}],
+        policy="healthcare-us-eu-v1",
+        decision="allow",
     )
     # The issued signature verifies under the pinned development key.
     assert hmac.compare_digest(
         receipt["signature"],
-        expected_signature(receipt["receipt_id"], "Patient [PERSON_1]",
-                           "healthcare-us-eu-v1", "allow", receipt["created_at"]),
+        expected_signature(
+            receipt["receipt_id"], "Patient [PERSON_1]", "healthcare-us-eu-v1", "allow", receipt["created_at"]
+        ),
     )
     # Tampering with the protected content invalidates the signature.
     assert not hmac.compare_digest(
         receipt["signature"],
-        expected_signature(receipt["receipt_id"], "Patient Jack",
-                           "healthcare-us-eu-v1", "allow", receipt["created_at"]),
+        expected_signature(
+            receipt["receipt_id"], "Patient Jack", "healthcare-us-eu-v1", "allow", receipt["created_at"]
+        ),
     )

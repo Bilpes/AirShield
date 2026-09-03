@@ -141,7 +141,8 @@ Expected result:
 The root `.env.local` contains non-secret hackathon defaults only:
 
 ```env
-NEXT_PUBLIC_EDGE_WS_URL=ws://localhost:8001/ws/voice
+NEXT_PUBLIC_EDGE_WS_URL=
+EDGE_UPSTREAM=http://127.0.0.1:8001
 AIRSHIELD_RUNTIME_MODE=development
 AIRSHIELD_ALLOW_DEVELOPMENT_RUNTIME=true
 AIRSHIELD_ALLOW_INSECURE_LOCAL_EDGE=true
@@ -163,7 +164,7 @@ The development stack starts:
 |---|---|---|
 | Web | `http://localhost:4174` | Responsive UI and protected server routes |
 | Control plane | `http://localhost:8080` | Policy, vault and signed evidence path |
-| Voice edge | `ws://localhost:8001/ws/voice` | Self-hosted English voice capture |
+| Voice edge | `/edge/ws/voice` (same-origin proxy → `localhost:8001`) | Self-hosted English voice capture |
 | PostgreSQL | Compose private network | Development persistence |
 
 The Compose configuration intentionally contains visible development credentials, local key material and development authorization. It is unsafe for production.
