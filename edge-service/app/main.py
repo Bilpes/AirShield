@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
 import hmac
 import json
@@ -138,10 +139,58 @@ def enforce_signed_final(result: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def local_protect(text: str, vault: dict[str, str]) -> dict[str, Any]:
+# Pinned development-only HMAC key. This signs LOCAL demo receipts only and lets
+# the self-hosted edge complete the full signed-receipt flow without the control
+# plane, Postgres, or Docker. Production never reaches this code path: the
+# production guards in config.py require a real control plane and the gateway
+# secret, and enforce_signed_final() still rejects any unsigned/untrusted final.
+DEVELOPMENT_RECEIPT_KEY = b"airshield-development-local-receipt-key-do-not-use-in-production"
+
+
+def development_signed_receipt(
+    *, protected: str, entities: list[dict], policy: str, decision: str = "allow"
+) -> dict[str, Any]:
+    receipt_id = "devrcpt_" + secrets.token_hex(8)
+    content_sha256 = hashlib.sha256(protected.encode()).hexdigest()
+    created_at = str(int(time.time()))
+    signing_input = "|".join(
+        ["airshield-development-receipt-v1", receipt_id, decision, policy, content_sha256, created_at]
+    )
+    signature = base64.urlsafe_b64encode(
+        hmac.new(DEVELOPMENT_RECEIPT_KEY, signing_input.encode(), hashlib.sha256).digest()
+    ).decode().rstrip("=")
+    return {
+        "receipt_id": receipt_id,
+        "content_sha256": content_sha256,
+        "entity_counts": dict(Counter(entity["type"] for entity in entities)),
+        "reason_codes": ["development_local_signed"],
+        "decision": decision,
+        "policy": policy,
+        "environment": "development",
+        "created_at": created_at,
+        "signature": signature,
+    }
+
+
+def local_protect(
+    text: str, vault: dict[str, str], *, final_egress: bool = False, policy: str | None = None
+) -> dict[str, Any]:
     if privacy is None:
         raise RuntimeError("Development privacy engine is disabled")
     protected, entities = privacy.protect(text, vault)
+    if final_egress:
+        # Final local development decisions are signed with the pinned dev key
+        # so the demo can complete the "signed allow receipt" path on a laptop.
+        policy_id = policy or "development-local-v1"
+        return {
+            "protected_text": protected,
+            "entities": entities,
+            "decision": "allow",
+            "receipt": development_signed_receipt(
+                protected=protected, entities=entities, policy=policy_id, decision="allow"
+            ),
+        }
+    # Interim/provisional turns remain explicitly unsigned and non-egressable.
     return {
         "protected_text": protected,
         "entities": entities,
@@ -193,7 +242,7 @@ async def protect_route(body: ProtectRequest, request: Request):
         return enforce_signed_final(result)
     if settings.environment == "production":
         raise HTTPException(503, "Privacy control unavailable; egress denied")
-    return local_protect(body.text, {})
+    return local_protect(body.text, {}, final_egress=True, policy=body.policy)
 
 
 @app.post("/v1/transcribe")
@@ -432,7 +481,7 @@ async def voice_stream(ws: WebSocket):
                             )
                         )
                     elif last_text and settings.environment != "production":
-                        final = local_protect(last_text, vault)
+                        final = local_protect(last_text, vault, final_egress=True, policy=policy)
                     else:
                         final = {
                             "protected_text": "",

@@ -57,6 +57,22 @@ npm run dev
 
 Open `http://localhost:4174`. The **Try the protection API** card uses the deterministic development detector; **Run sample** displays explicitly labelled synthetic transcript data. **Start live capture** never falls back to a browser/vendor speech-recognition API: it requires the self-hosted edge on port `8001` (or an authenticated production gateway) described below. A production build with no configured control plane returns HTTP 503 from protection, session, health, and AI-egress paths rather than silently using the demo detector.
 
+## Run live voice locally — no Docker required
+
+For a demo with **real microphone transcription** running entirely on your machine (no containers, no Postgres, no control plane):
+
+```bash
+./run_local.sh
+```
+
+This one command:
+
+1. Creates a Python virtualenv for the voice edge and installs its requirements on first run (Python 3.11+; audio decoding uses the PyAV-bundled ffmpeg, so system ffmpeg is not needed).
+2. Starts the self-hosted **voice edge** on `http://localhost:8001` (`ws://localhost:8001/ws/voice`) with the local privacy engine. Interim transcript pairs stay provisional/unsigned; the final session-end decision is signed with a pinned **development-only** HMAC key and returned as `allow` with a real (non-`demo_unsigned`) signature, so Live Shield and CareShield Assistant complete the full signed-egress flow on a laptop.
+3. Waits until the edge is healthy (up to 10 minutes on first run while the Whisper model downloads) and then starts the Next.js UI on `http://localhost:4174`.
+
+The UI polls the edge health endpoint every 5 seconds: once it is up, **Start live capture** and the CareShield microphone button enable themselves. Use `ASR_MODEL=small.en ./run_local.sh` for higher transcription accuracy. `./run_local.sh --edge` and `./run_local.sh --web` run the two processes in separate terminals. The Docker Compose stack below remains available as the full-stack option.
+
 ## Run the validated control plane locally
 
 ```bash

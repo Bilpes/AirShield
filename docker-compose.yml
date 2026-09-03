@@ -64,12 +64,14 @@ services:
     build: ./edge-service
     ports: ["8001:8001"]
     environment:
-      ASR_MODEL: small.en
+      # base.en keeps the first Docker demo quick; set ASR_MODEL=small.en for
+      # higher accuracy (more RAM + a larger first-run model download).
+      ASR_MODEL: ${ASR_MODEL:-base.en}
       ASR_DEVICE: cpu
       ASR_COMPUTE_TYPE: int8
       LANGUAGE: en
       ENABLE_DIARIZATION: "false"
-      ALLOW_ORIGINS: http://localhost:4174
+      ALLOW_ORIGINS: http://localhost:4174,http://127.0.0.1:4174
       CONTROL_PLANE_URL: http://control-plane:8080
       CONTROL_PLANE_DEV_TOKEN: development-only
     volumes: [model-cache:/models]

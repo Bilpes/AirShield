@@ -53,7 +53,17 @@ It is not a certification product and this repository is not proof of GDPR, HIPA
 - Node.js 22+
 - npm 10+
 
-### Full local stack
+### Full local voice demo (no Docker required)
+
+- Node.js 22+ and npm 10+
+- Python 3.11+ with pip and `venv` (3.12 matches the production image)
+- ~250 MB free disk for the Python venv and the `base.en` Whisper model on first run
+  (set `ASR_MODEL=small.en` for higher accuracy; ~460 MB)
+- Microphone permission in a Chromium/Firefox-class browser for live audio
+- ffmpeg/libsndfile are **not** required for the local venv path (audio decoding
+  uses the PyAV-bundled ffmpeg libraries)
+
+### Full Docker Compose stack (alternative)
 
 - Docker Engine with Compose v2
 - At least 8 GB free memory for a CPU edge demonstration; more is recommended
@@ -63,7 +73,7 @@ It is not a certification product and this repository is not proof of GDPR, HIPA
 
 - Python 3.12 (production image version)
 - PostgreSQL 16/17
-- `ffmpeg` and `libsndfile` for local voice processing
+- `ffmpeg` and `libsndfile` for the containerised/manual control-plane path
 
 ## 6. Fastest run: responsive synthetic UI
 
@@ -91,7 +101,52 @@ Open **EgressSeal™** from the sidebar or the mobile Seal tab to demonstrate th
 
 The embedded Ed25519 key and receipt registry are process-local and exist only to prove the hackathon protocol. Seal issuance still requires an upstream receipt registered by `/api/protect` with matching protected digest, decision, policy and destination. Production must replace both with an externally trusted KMS/HSM key, authoritative upstream-receipt verification and a separately authorized action broker. The ™ marks denote product-concept branding, not registered trademarks.
 
-## 7. Full local Docker Compose stack
+## 7. Fastest live-voice run — local, no Docker
+
+From the repository root, one command starts **both** the Next.js UI and the
+self-hosted Python voice edge on this machine (no containers, no control plane,
+no Postgres):
+
+```bash
+./run_local.sh
+```
+
+Then open `http://localhost:4174`. The script:
+
+1. Creates `edge-service/.venv` and installs the edge requirements on first run.
+2. Starts the voice edge on `http://localhost:8001`
+   (`ws://localhost:8001/ws/voice`), with the deterministic local privacy engine
+   and a pinned **development-only** HMAC signing key.
+3. Waits (up to 10 minutes on first run, while deps install and the Whisper
+   model downloads) until `/v1/health` responds, then starts the Next.js UI.
+
+Live capture verification:
+
+1. Open **Live shield** — the status pill shows **Voice edge ready** once the
+   edge health check passes; the page polls every 5 s while the edge starts.
+2. Select **Start live capture**, allow the microphone, and speak an English
+   sentence containing test identifiers. Raw text appears only in the left
+   trust-boundary pane; the masked version appears on the right.
+3. Select **Stop & protect**. The edge forces a final transcription, runs the
+   privacy policy, and returns a **signed development receipt**
+   (`decision=allow`, `safe_for_egress=true`) so the demo completes the full
+   signed-egress path entirely on the laptop.
+4. The **CareShield Assistant** microphone button enables automatically under
+   the same condition and routes only protected text into the booking demo.
+
+Separately, the two processes can be started in two terminals:
+
+```bash
+./run_local.sh --edge   # terminal 1: voice edge on :8001
+./run_local.sh --web    # terminal 2: Next.js UI on :4174
+```
+
+Model size is overridable, e.g. `ASR_MODEL=small.en ./run_local.sh`. If the spaCy
+`en_core_web_sm` model cannot be downloaded, the edge still runs: Presidio
+contextual detection is optional and the deterministic PII/PHI/PCI rules always
+apply. This local path is development-only; it is not the production trust model.
+
+## 8. Full local Docker Compose stack
 
 ```bash
 docker compose up --build
@@ -137,7 +192,7 @@ Remove development data as well:
 docker compose down -v
 ```
 
-## 8. Manual control-plane run
+## 9. Manual control-plane run
 
 ```bash
 cd control-plane
@@ -169,7 +224,7 @@ python examples/python/client.py
 node examples/node/client.mjs
 ```
 
-## 9. Manual UI-to-control-plane development
+## 10. Manual UI-to-control-plane development
 
 The repository includes a non-secret development file at `/.env.local`, in the repository root beside `package.json`:
 
@@ -196,13 +251,25 @@ npm run dev
 
 The Next.js server creates and reuses a control-plane session for non-voice LiveShield operations. Browser bearer headers are never forwarded.
 
-## 10. Voice edge and gateway development
+## 11. Voice edge and gateway development
 
-The Compose stack is the easiest supported local voice run. For component work:
+For local voice development without Docker, run the edge directly (it creates
+its own venv and serves `ws://localhost:8001/ws/voice` with the local privacy
+engine and development-signed receipts):
 
 ```bash
-# Edge tests
-(cd edge-service && PYTHONPATH=. ../control-plane/.venv/bin/pytest -q tests)
+cd edge-service && ./run_dev_edge.sh        # uses ASR_MODEL=base.en by default
+ASR_MODEL=small.en ./run_dev_edge.sh        # higher accuracy
+```
+
+The Compose stack is the full-stack alternative. For component work:
+
+```bash
+# Edge tests (standalone venv)
+(cd edge-service && . .venv/bin/activate && python -m pytest -q tests)
+
+# Gateway tests
+(cd gateway-service && PYTHONPATH=. ../control-plane/.venv/bin/pytest -q tests)
 
 # Gateway tests
 (cd gateway-service && PYTHONPATH=. ../control-plane/.venv/bin/pytest -q tests)
@@ -219,7 +286,7 @@ Production voice prerequisites are intentionally stricter:
 - preloaded read-only ASR/diarization files plus a signed release manifest;
 - representative ASR, diarization, detector, and end-to-end quality gates.
 
-## 11. Production Kubernetes/Azure sequence
+## 12. Production Kubernetes/Azure sequence
 
 The manifests contain `REPLACE_*` placeholders and cannot be deployed safely without release engineering.
 
@@ -243,7 +310,7 @@ az bicep build --file deploy/azure/main.bicep
 
 See `deploy/kubernetes/README.md` and `deploy/azure/README.md` for the complete release checklist.
 
-## 12. Validation
+## 13. Validation
 
 From the repository root after creating `control-plane/.venv`:
 
@@ -268,7 +335,7 @@ The included synthetic evaluator is only a regression smoke test:
 
 It deliberately reports `production_gate_satisfied: false`; only a representative, legally sourced and approved evaluation can satisfy the production gate.
 
-## 13. Evidence export
+## 14. Evidence export
 
 After configuring production database and key-verification access:
 
@@ -281,7 +348,7 @@ python scripts/export_evidence.py \
 
 The exporter verifies the chain, persisted tail, and signatures before writing mode-0600 JSONL plus a SHA-256 sidecar. Upload immediately to independently administered retention-locked storage and record an external timestamp/object version. The sidecar alone is not an immutable anchor.
 
-## 14. Important remaining release work
+## 15. Important remaining release work
 
 - Run real faster-whisper, optional pyannote, contextual Presidio, codec, long-session, and adversarial stream evaluations on representative approved data.
 - Run PostgreSQL concurrency/load/restore tests in the target managed service.

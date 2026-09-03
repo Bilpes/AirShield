@@ -96,9 +96,10 @@ export function DoctorBookingBot({ notify }: { notify: (message: string) => void
     [],
   );
 
-  // Check if edge service is available for voice
+  // Poll the local voice edge health endpoint. The edge runs on the laptop via
+  // ./run_local.sh (no Docker required); polling lets voice enable itself
+  // automatically as soon as the edge finishes starting.
   useEffect(() => {
-    if (voiceAvailable !== null) return;
     const url = edgeUrl();
     if (!url) {
       setVoiceAvailable(false);
@@ -106,18 +107,28 @@ export function DoctorBookingBot({ notify }: { notify: (message: string) => void
     }
     // ws://localhost:8001/ws/voice -> http://localhost:8001/v1/health
     const healthUrl = url.replace(/^ws:/, "http:").replace(/\/ws\/voice$/, "/v1/health");
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000);
-    fetch(healthUrl, { method: "GET", signal: controller.signal })
-      .then(res => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    async function check() {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4000);
+      try {
+        const res = await fetch(healthUrl, { method: "GET", signal: controller.signal, cache: "no-store" });
         clearTimeout(timeout);
-        setVoiceAvailable(res.ok);
-      })
-      .catch(() => {
-        clearTimeout(timeout);
+        if (cancelled) return;
+        if (res.ok) {
+          setVoiceAvailable(true);
+          return;
+        }
         setVoiceAvailable(false);
-      });
-  }, [voiceAvailable]);
+      } catch {
+        if (!cancelled) setVoiceAvailable(false);
+      }
+      if (!cancelled) timer = setTimeout(check, 5000);
+    }
+    void check();
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, []);
 
   async function ensureSession(): Promise<string> {
     if (session.current) return session.current;
@@ -507,12 +518,12 @@ export function DoctorBookingBot({ notify }: { notify: (message: string) => void
         </>}
         {voiceDraft && <div className="doctor-bot-voice-state"><span className="voice-bars">{[5,11,17,8,14,19,7,13].map((height,index)=><i key={index} style={{height}}/>)}</span><span>{voiceDraft}</span></div>}
         {voiceError && <div className="doctor-bot-error" role="alert"><AlertTriangle size={13}/><span>{voiceError}</span></div>}
-        {voiceAvailable === false && !voiceDraft && !voiceError && <div className="doctor-bot-error" role="alert"><AlertTriangle size={13}/><span>Voice requires Docker. Run: docker compose up. Use text input instead.</span></div>}
+        {voiceAvailable === false && !voiceDraft && !voiceError && <div className="doctor-bot-error" role="alert"><AlertTriangle size={13}/><span>Voice edge not running on port 8001. Start it with ./run_local.sh (no Docker needed) or docker compose up — voice re-enables automatically. Text input works meanwhile.</span></div>}
       </div>
 
       <form className="doctor-bot-compose" onSubmit={submit}>
         <label><span className="sr-only">Doctor booking command</span><input value={input} onChange={(event)=>setInput(event.target.value)} placeholder="Type symptoms or booking request…" maxLength={4000}/></label>
-        <button type="button" className={recording?"recording":""} onClick={recording?stopVoice:startVoice} disabled={voiceAvailable === false && !recording} title={voiceAvailable === false ? "Voice requires Docker. Use text input." : "Protected voice command"} aria-label={recording?"Stop voice command":"Start protected voice command"}>{recording?<CircleStop size={18}/>:<Mic size={18}/>}</button>
+        <button type="button" className={recording?"recording":""} onClick={recording?stopVoice:startVoice} disabled={voiceAvailable === false && !recording} title={voiceAvailable === false ? "Voice edge offline — run ./run_local.sh (or docker compose up). Use text input meanwhile." : "Protected voice command"} aria-label={recording?"Stop voice command":"Start protected voice command"}>{recording?<CircleStop size={18}/>:<Mic size={18}/>}</button>
         <button type="submit" disabled={busy||recording||!input.trim()} aria-label="Protect and send booking command"><Send size={18}/></button>
         <small><ShieldCheck size={11}/>Only protected text enters the RIA and trusted booking demonstration path.</small>
       </form>
