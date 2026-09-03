@@ -48,7 +48,7 @@ Regenerate all five implementation PDFs with `python scripts/build_release_pdfs.
 
 ## Run the UI demo
 
-The repository includes a non-secret development file at **`/.env.local`**, in the repository root beside `package.json`, `next.config.ts`, and `docker-compose.yml`. It configures the browser to use `ws://localhost:8001/ws/voice`. Never add production credentials to this file.
+The repository includes a non-secret development file at **`/.env.local`**, in the repository root beside `package.json`, `next.config.ts`, and `docker-compose.yml`. It leaves `NEXT_PUBLIC_EDGE_WS_URL` empty, so the browser uses the **same-origin voice proxy**: the UI opens `/edge/ws/voice` on the web app's origin and Next.js forwards it to the voice edge on `localhost:8001`. Never add production credentials to this file.
 
 ```bash
 npm ci
@@ -68,7 +68,7 @@ For a demo with **real microphone transcription** running entirely on your machi
 This one command:
 
 1. Creates a Python virtualenv for the voice edge and installs its requirements on first run (Python 3.11+; audio decoding uses the PyAV-bundled ffmpeg, so system ffmpeg is not needed).
-2. Starts the self-hosted **voice edge** on `http://localhost:8001` (`ws://localhost:8001/ws/voice`) with the local privacy engine. Interim transcript pairs stay provisional/unsigned; the final session-end decision is signed with a pinned **development-only** HMAC key and returned as `allow` with a real (non-`demo_unsigned`) signature, so Live Shield and CareShield Assistant complete the full signed-egress flow on a laptop.
+2. Starts the self-hosted **voice edge** on `http://localhost:8001` (browsers reach it through the same-origin proxy `/edge/ws/voice`, so voice also works from LAN IPs and HTTPS hosts) with the local privacy engine. Interim transcript pairs stay provisional/unsigned; the final session-end decision is signed with a pinned **development-only** HMAC key and returned as `allow` with a real (non-`demo_unsigned`) signature, so Live Shield and CareShield Assistant complete the full signed-egress flow on a laptop.
 3. Waits until the edge is healthy (up to 10 minutes on first run while the Whisper model downloads) and then starts the Next.js UI on `http://localhost:4174`.
 
 The UI polls the edge health endpoint every 5 seconds: once it is up, **Start live capture** and the CareShield microphone button enable themselves. Use `ASR_MODEL=small.en ./run_local.sh` for higher transcription accuracy. `./run_local.sh --edge` and `./run_local.sh --web` run the two processes in separate terminals. The Docker Compose stack below remains available as the full-stack option.

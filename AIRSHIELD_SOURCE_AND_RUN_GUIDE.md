@@ -114,8 +114,9 @@ no Postgres):
 Then open `http://localhost:4174`. The script:
 
 1. Creates `edge-service/.venv` and installs the edge requirements on first run.
-2. Starts the voice edge on `http://localhost:8001`
-   (`ws://localhost:8001/ws/voice`), with the deterministic local privacy engine
+2. Starts the voice edge on `http://localhost:8001` (browsers dial the
+   same-origin proxy `/edge/ws/voice`, which the web app forwards to it),
+   with the deterministic local privacy engine
    and a pinned **development-only** HMAC signing key.
 3. Waits (up to 10 minutes on first run, while deps install and the Whisper
    model downloads) until `/v1/health` responds, then starts the Next.js UI.
@@ -178,7 +179,7 @@ To verify live capture:
 3. Select **Stop & protect**. The edge now forces processing of the final audio chunk, including short utterances that did not reach the periodic streaming threshold.
 4. Use **Reset** to stop the recorder, release the microphone, close the socket, and clear both transcript panes. The separate protection-card reset clears typed API data.
 
-If the UI reports that the voice edge is unavailable, verify that port `8001` is reachable and that `NEXT_PUBLIC_EDGE_WS_URL` was present at **web build time**. Microphone capture requires HTTPS except on `localhost`. Production must point the browser to the authenticated gateway over `wss://`, not directly to the edge.
+If the UI reports that the voice edge is unavailable, verify that port `8001` is reachable from the machine running the web app and that `EDGE_UPSTREAM` (default `http://127.0.0.1:8001`) pointed at the edge when the web server/build started. Microphone capture requires HTTPS except on `localhost`. To bypass the same-origin proxy, set `NEXT_PUBLIC_EDGE_WS_URL` to an absolute `ws://`/`wss://` URL at **web build time**; production must point the browser to the authenticated gateway over `wss://`, not directly to the edge.
 
 Stop and remove containers:
 
@@ -229,7 +230,8 @@ node examples/node/client.mjs
 The repository includes a non-secret development file at `/.env.local`, in the repository root beside `package.json`:
 
 ```env
-NEXT_PUBLIC_EDGE_WS_URL=ws://localhost:8001/ws/voice
+NEXT_PUBLIC_EDGE_WS_URL=
+EDGE_UPSTREAM=http://127.0.0.1:8001
 AIRSHIELD_RUNTIME_MODE=development
 AIRSHIELD_ALLOW_DEVELOPMENT_RUNTIME=true
 AIRSHIELD_ALLOW_INSECURE_LOCAL_EDGE=true
@@ -254,7 +256,8 @@ The Next.js server creates and reuses a control-plane session for non-voice Live
 ## 11. Voice edge and gateway development
 
 For local voice development without Docker, run the edge directly (it creates
-its own venv and serves `ws://localhost:8001/ws/voice` with the local privacy
+its own venv and serves `ws://localhost:8001/ws/voice` — reached from the
+browser via the same-origin `/edge/ws/voice` proxy — with the local privacy
 engine and development-signed receipts):
 
 ```bash

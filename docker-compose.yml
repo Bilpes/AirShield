@@ -4,8 +4,11 @@ services:
     build:
       context: .
       args:
-        NEXT_PUBLIC_EDGE_WS_URL: ws://localhost:8001/ws/voice
+        # Empty by default: browsers use the same-origin /edge/ws/voice proxy.
+        NEXT_PUBLIC_EDGE_WS_URL:
         AIRSHIELD_ALLOW_INSECURE_LOCAL_EDGE: "true"
+        # Rewrite upstream for the same-origin /edge proxy inside the stack.
+        EDGE_UPSTREAM: http://edge:8001
     ports: ["4174:4174"]
     environment:
       AIRSHIELD_RUNTIME_MODE: development

@@ -4,10 +4,13 @@
 #
 # Starts BOTH:
 #   1. The Next.js web UI  -> http://localhost:4174
-#   2. The voice edge      -> ws://localhost:8001/ws/voice  (live microphone)
+#   2. The voice edge      -> http://localhost:8001 (proxied same-origin)
 #
-# so that Live Shield and CareShield Assistant can transcribe real voice with
-# everything running on this machine. Docker is never required for this path —
+# The browser opens /edge/ws/voice on the web app's own origin and Next.js
+# forwards it to the voice edge on port 8001 — no cross-origin WebSocket, so
+# live voice also works from LAN IPs and HTTPS hosts. This keeps Live Shield
+# and CareShield Assistant transcribing real voice with everything running on
+# this machine. Docker is never required for this path —
 # `docker compose up` remains available as the full-stack alternative.
 #
 # If you only run the web app (npm run dev) WITHOUT the edge, live voice shows
@@ -35,7 +38,7 @@ edge_pid=""
 edge_log="$(mktemp -t airshield-edge.XXXXXX.log)"
 
 start_edge() {
-  echo "==> Starting self-hosted voice edge on :$EDGE_PORT  (ws://localhost:$EDGE_PORT/ws/voice)"
+  echo "==> Starting self-hosted voice edge on :$EDGE_PORT  (proxied at /edge/ws/voice)"
   echo "    First run creates a Python venv, installs requirements, and downloads"
   echo "    the Whisper model — this can take several minutes. Log: $edge_log"
   bash "$EDGE_SCRIPT" >"$edge_log" 2>&1 &
@@ -72,7 +75,7 @@ start_web() {
     (cd "$ROOT" && npm install)
   fi
   echo "==> Starting web app on http://localhost:$WEB_PORT"
-  echo "    Live voice uses the local edge (ws://localhost:$EDGE_PORT/ws/voice)."
+  echo "    Live voice uses the same-origin proxy /edge/ws/voice -> localhost:$EDGE_PORT."
   npm run dev
 }
 

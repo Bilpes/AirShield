@@ -15,6 +15,7 @@ import {
   Video,
   X,
 } from "lucide-react";
+import { edgeHealthUrl, edgeWebSocketUrl } from "@/lib/edge";
 
 type ChatItem =
   | { id: string; kind: "assistant" | "user"; text: string }
@@ -96,17 +97,19 @@ export function DoctorBookingBot({ notify }: { notify: (message: string) => void
     [],
   );
 
-  // Poll the local voice edge health endpoint. The edge runs on the laptop via
-  // ./run_local.sh (no Docker required); polling lets voice enable itself
-  // automatically as soon as the edge finishes starting.
+  // Poll the voice edge health endpoint through the same-origin /edge proxy.
+  // The edge runs on the machine via ./run_local.sh (no Docker required);
+  // polling lets voice enable itself automatically as soon as the edge
+  // finishes starting.
   useEffect(() => {
-    const url = edgeUrl();
+    const url = edgeWebSocketUrl();
     if (!url) {
       setVoiceAvailable(false);
       return;
     }
-    // ws://localhost:8001/ws/voice -> http://localhost:8001/v1/health
-    const healthUrl = url.replace(/^ws:/, "http:").replace(/\/ws\/voice$/, "/v1/health");
+    // Health endpoint of the edge the browser will dial — by default the
+    // same-origin proxy (/edge/ws/voice -> /edge/v1/health).
+    const healthUrl = edgeHealthUrl(url);
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
     async function check() {
@@ -264,19 +267,6 @@ export function DoctorBookingBot({ notify }: { notify: (message: string) => void
     await protectAndSend(value);
   }
 
-  function edgeUrl(): string | null {
-    const configured = process.env.NEXT_PUBLIC_EDGE_WS_URL?.trim();
-    if (configured) return configured;
-    if (
-      typeof window !== "undefined" &&
-      window.location.protocol === "http:" &&
-      ["localhost", "127.0.0.1"].includes(window.location.hostname)
-    ) {
-      return `ws://${window.location.hostname}:8001/ws/voice`;
-    }
-    return null;
-  }
-
   function releaseVoice() {
     stream.current?.getTracks().forEach((track) => track.stop());
     stream.current = null;
@@ -285,9 +275,9 @@ export function DoctorBookingBot({ notify }: { notify: (message: string) => void
   }
 
   async function startVoice() {
-    const url = edgeUrl();
+    const url = edgeWebSocketUrl();
     if (!url) {
-      const message = "Configure NEXT_PUBLIC_EDGE_WS_URL to use voice booking demo, or use text input.";
+      const message = "Voice capture is unavailable in this browser. Use text input, or configure NEXT_PUBLIC_EDGE_WS_URL for a direct edge connection.";
       setVoiceError(message);
       notify(message);
       return;
