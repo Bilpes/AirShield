@@ -43,7 +43,7 @@ class TokenVault:
         lookup = self._lookup(tenant_id, session_id, entity_type, raw)
         connection = await db.connection()
         if connection.dialect.name == "postgresql":
-            lock_key = f"{tenant_id}\0{session_id}\0{lookup}"
+            lock_key = f"{tenant_id}:{session_id}:{lookup}"
             await db.execute(
                 text("SELECT pg_advisory_xact_lock(hashtextextended(:lock_key, 0))"),
                 {"lock_key": lock_key},

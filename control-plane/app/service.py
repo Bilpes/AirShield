@@ -118,7 +118,7 @@ async def protect(db: AsyncSession, principal: Principal, request: ProtectReques
     if connection.dialect.name == "postgresql":
         await db.execute(
             text("SELECT pg_advisory_xact_lock(hashtextextended(:lock_key, 0))"),
-            {"lock_key": f"{principal.tenant_id}\0{request.idempotency_key}"},
+            {"lock_key": f"{principal.tenant_id}:{request.idempotency_key}"},
         )
     existing = await db.scalar(
         select(IdempotencyRecord).where(
